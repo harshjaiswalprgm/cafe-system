@@ -1,214 +1,286 @@
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
 
 export default function Menu() {
   const { table } = useParams();
-  const [menuItems, setMenuItems] = useState([]);
+  const [items, setItems] = useState([]);
+  const [activeCategory, setActiveCategory] = useState("All");
+  const [search, setSearch] = useState("");
   const [cart, setCart] = useState([]);
-  const [myOrder, setMyOrder] = useState(null);
-  const [showQR, setShowQR] = useState(false);
+  const [placing, setPlacing] = useState(false);
+  const [dark, setDark] = useState(false);
 
-  // Fetch menu from backend
   useEffect(() => {
     fetch("http://localhost:5000/items")
-      .then((r) => r.json())
-      .then(setMenuItems)
-      .catch(() => setMenuItems([]));
+      .then((res) => res.json())
+      .then(setItems)
+      .catch(() => setItems([]));
   }, []);
 
-  const addToCart = (item) => setCart((prev) => [...prev, item]);
+  const categories = useMemo(() => {
+    const cats = Array.from(new Set(items.map((i) => i.category || "Others")));
+    return ["All", ...cats];
+  }, [items]);
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      const catMatch =
+        activeCategory === "All" ||
+        (item.category || "Others") === activeCategory;
+      const searchMatch =
+        !search ||
+        item.name.toLowerCase().includes(search.toLowerCase());
+      return catMatch && searchMatch;
+    });
+  }, [items, activeCategory, search]);
+
+  const addToCart = (item) => {
+    setCart((prev) => {
+      const idx = prev.findIndex((c) => c.item.id === item.id);
+      if (idx === -1) return [...prev, { item, qty: 1 }];
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], qty: copy[idx].qty + 1 };
+      return copy;
+    });
+  };
+
+  const changeQty = (id, delta) => {
+    setCart((prev) =>
+      prev
+        .map((c) =>
+          c.item.id === id ? { ...c, qty: c.qty + delta } : c
+        )
+        .filter((c) => c.qty > 0)
+    );
+  };
+
+  const removeItem = (id) => {
+    setCart((prev) => prev.filter((c) => c.item.id !== id));
+  };
+
+  const cartTotal = cart.reduce(
+    (sum, c) => sum + c.item.price * c.qty,
+    0
+  );
 
   const placeOrder = async () => {
-    if (cart.length === 0) return alert("Cart is empty!");
+    if (!cart.length) return alert("Cart is empty!");
+    setPlacing(true);
+
+    const expandedCart = cart.flatMap((c) =>
+      Array.from({ length: c.qty }).map(() => ({
+        name: c.item.name,
+        price: c.item.price,
+      }))
+    );
 
     await fetch("http://localhost:5000/order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ table, cart }),
+      body: JSON.stringify({ table, cart: expandedCart }),
     });
 
     alert("✅ Order placed!");
     setCart([]);
+    setPlacing(false);
   };
 
-  // Poll for my order status
-  useEffect(() => {
-    const id = setInterval(async () => {
-      const res = await fetch("http://localhost:5000/orders");
-      const data = await res.json();
-      setMyOrder(data.find((o) => o.table === table));
-    }, 2000);
-
-    return () => clearInterval(id);
-  }, [table]);
-
-  const activeTotal =
-    myOrder?.cart?.reduce((s, i) => s + i.price, 0) ||
-    cart.reduce((s, i) => s + i.price, 0);
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-neutral-900 to-black flex items-center justify-center px-4">
-      <div className="w-full max-w-5xl grid md:grid-cols-3 gap-6">
-        {/* Menu */}
-        <div className="md:col-span-2 bg-neutral-900/90 border border-orange-500/40 rounded-3xl p-6 shadow-2xl backdrop-blur-xl">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h1 className="text-xl font-bold text-orange-400">
-                Bachelor&apos;s Hub
-              </h1>
-              <p className="text-xs text-neutral-300">
-                Scan. Order. Relax at Table {table}.
-              </p>
-            </div>
-            <span className="text-[10px] px-2 py-1 bg-neutral-800 rounded-full border border-orange-500/60 text-orange-300">
-              QR Ordering Active
-            </span>
+    <div
+      className={`min-h-screen transition ${
+        dark ? "bg-slate-900 text-white" : "bg-orange-100 text-slate-900"
+      }`}
+    >
+      {/* ✅ FIXED ATTRACTIVE NAVBAR */}
+      <header
+        className={`border-b ${
+          dark
+            ? "bg-slate-950 border-slate-700"
+            : "bg-white/90 backdrop-blur"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+          <div>
+            <p className={`${dark ? "text-slate-300" : "text-slate-500"} text-xs`}>
+              Bachelor&apos;s Hub
+            </p>
+            <h1 className="text-lg font-bold text-orange-500">
+              Table #{table}
+            </h1>
           </div>
 
-          {menuItems.length === 0 && (
-            <p className="text-xs text-neutral-400">
-              No items added yet. Ask admin to add menu.
-            </p>
-          )}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setDark(!dark)}
+              className={`px-3 py-1 text-xs rounded-full border font-semibold ${
+                dark
+                  ? "bg-slate-800 border-slate-600 text-white"
+                  : "bg-slate-100 text-slate-800"
+              }`}
+            >
+              {dark ? "☀ Light" : "🌙 Dark"}
+            </button>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            {menuItems.map((item) => (
+            <span className="px-3 py-1 text-xs rounded-full bg-green-100 text-green-700">
+              QR Active
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto p-4 flex gap-6">
+        {/* ✅ LEFT */}
+        <section className="flex-1">
+          {/* ✅ CATEGORY – FIXED VISIBILITY IN DARK */}
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold border ${
+                  activeCategory === cat
+                    ? "bg-orange-500 text-white border-orange-500"
+                    : dark
+                    ? "bg-slate-800 text-white border-slate-600"
+                    : "bg-white text-slate-800 border-slate-300"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* ✅ SEARCH – FIXED DARK MODE */}
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search drinks, snacks, pizza..."
+            className={`w-full px-4 py-2 mb-5 rounded-xl border ${
+              dark
+                ? "bg-slate-800 border-slate-600 text-white placeholder-slate-400"
+                : "bg-white text-black placeholder-slate-500"
+            }`}
+          />
+
+          {/* ✅ ITEMS */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredItems.map((item) => (
               <div
                 key={item.id}
-                className="bg-neutral-900 border border-neutral-700 rounded-2xl p-4 flex flex-col justify-between hover:border-orange-400 hover:-translate-y-1 hover:shadow-lg transition"
+                className={`rounded-2xl shadow p-3 flex flex-col ${
+                  dark ? "bg-slate-800 text-white" : "bg-white"
+                }`}
               >
-                <div className="flex gap-3">
-                  {item.imageUrl ? (
-                    <img
-                      src={item.imageUrl}
-                      alt={item.name}
-                      className="w-14 h-14 rounded-xl object-cover border border-neutral-700"
-                    />
-                  ) : (
-                    <div className="w-14 h-14 rounded-xl bg-neutral-800 flex items-center justify-center text-[10px] text-neutral-400 border border-neutral-700">
-                      No Image
-                    </div>
-                  )}
-                  <div>
-                    <h3 className="font-semibold text-sm">{item.name}</h3>
-                    <p className="text-[11px] text-neutral-400">
-                      {item.category || "Item"}
-                    </p>
+                {item.imageUrl ? (
+                  <img
+                    src={item.imageUrl}
+                    alt={item.name}
+                    className="h-32 w-full object-cover rounded-xl"
+                  />
+                ) : (
+                  <div
+                    className={`h-32 rounded-xl flex items-center justify-center text-xs ${
+                      dark ? "bg-slate-700 text-slate-300" : "bg-orange-50"
+                    }`}
+                  >
+                    No image
                   </div>
-                </div>
+                )}
 
-                <div className="flex items-center justify-between mt-3">
-                  <span className="text-orange-400 font-bold text-sm">
+                <h3 className="mt-2 font-semibold">{item.name}</h3>
+                <p className="text-xs opacity-70">{item.category}</p>
+
+                <div className="mt-auto flex justify-between items-center">
+                  <span className="text-orange-500 font-bold">
                     ₹{item.price}
                   </span>
+
                   <button
                     onClick={() => addToCart(item)}
-                    className="text-xs px-3 py-1 rounded-full bg-orange-500 text-black font-semibold hover:bg-orange-400 transition"
+                    className="h-9 w-9 bg-orange-500 text-white rounded-full text-lg"
                   >
-                    Add
+                    +
                   </button>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* Cart + Status + Payment */}
-        <div className="bg-neutral-900/90 border border-orange-500/40 rounded-3xl p-5 shadow-2xl flex flex-col justify-between">
-          <div>
-            <h2 className="font-semibold text-sm mb-2">🛒 Your Cart</h2>
-            {cart.length === 0 && (
-              <p className="text-xs text-neutral-400 mb-2">
-                Add items to place a new order.
-              </p>
-            )}
-            <div className="space-y-1 max-h-32 overflow-y-auto text-xs">
-              {cart.map((c, i) => (
-                <div key={i} className="flex justify-between">
-                  <span>{c.name}</span>
-                  <span>₹{c.price}</span>
+        {/* ✅ RIGHT CART – FIXED DARK MODE */}
+        <aside
+          className={`w-96 rounded-2xl shadow p-4 ${
+            dark ? "bg-slate-850 text-white border border-slate-700" : "bg-white"
+          }`}
+        >
+          <h2 className="font-bold mb-3">Current Order</h2>
+
+          <div className="space-y-2 max-h-[360px] overflow-y-auto">
+            {cart.map(({ item, qty }) => (
+              <div
+                key={item.id}
+                className={`flex justify-between items-center px-3 py-2 rounded-lg ${
+                  dark ? "bg-slate-700" : "bg-orange-50"
+                }`}
+              >
+                <div>
+                  <p className="text-sm font-semibold">{item.name}</p>
+                  <p className="text-xs opacity-70">
+                    ₹{item.price} × {qty}
+                  </p>
                 </div>
-              ))}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => changeQty(item.id, -1)}
+                    className="h-7 w-7 flex items-center justify-center bg-orange-200 rounded-full font-bold text-black"
+                  >
+                    –
+                  </button>
+
+                  <span className="font-bold">{qty}</span>
+
+                  <button
+                    onClick={() => changeQty(item.id, +1)}
+                    className="h-7 w-7 flex items-center justify-center bg-orange-500 text-white rounded-full font-bold"
+                  >
+                    +
+                  </button>
+
+                  <button
+                    onClick={() => removeItem(item.id)}
+                    className="ml-1 text-red-400 text-sm"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 border-t pt-3 text-sm">
+            <div className="flex justify-between font-bold text-orange-500">
+              <span>Total</span>
+              <span>₹{cartTotal}</span>
             </div>
-
-            {cart.length > 0 && (
-              <button
-                onClick={placeOrder}
-                className="mt-3 w-full text-xs py-2 rounded-full bg-orange-500 text-black font-semibold hover:bg-orange-400 transition"
-              >
-                ✅ Place Order
-              </button>
-            )}
-
-            <hr className="my-3 border-neutral-700" />
-
-            <h2 className="font-semibold text-sm mb-1">📦 Order Status</h2>
-            <p className="text-xs">
-              Status:{" "}
-              <span className="font-semibold text-orange-300">
-                {myOrder?.status || "No active order"}
-              </span>
-            </p>
-            <p className="text-xs">
-              Payment:{" "}
-              <span
-                className={
-                  myOrder?.paymentStatus === "Paid"
-                    ? "text-emerald-400 font-semibold"
-                    : "text-yellow-300 font-semibold"
-                }
-              >
-                {myOrder?.paymentStatus || "Unpaid"}
-              </span>
-            </p>
-
-            <p className="mt-2 text-sm font-semibold">
-              Total: <span className="text-orange-400">₹{activeTotal}</span>
-            </p>
           </div>
 
-          <div className="mt-4 space-y-2">
-            <button
-              onClick={() => alert("Please pay at the counter.")}
-              className="w-full text-xs py-2 rounded-full bg-neutral-800 border border-neutral-700 hover:border-neutral-500 transition"
-            >
-              💵 Pay at Counter
-            </button>
-            <button
-              onClick={() => setShowQR(true)}
-              className="w-full text-xs py-2 rounded-full bg-orange-500 text-black font-semibold hover:bg-orange-400 transition"
-            >
-              📲 Pay Online (UPI QR)
-            </button>
-          </div>
-        </div>
-      </div>
+          <button
+            onClick={placeOrder}
+            disabled={placing || !cart.length}
+            className="w-full mt-4 bg-orange-500 text-white py-2 rounded-xl font-bold"
+          >
+            {placing ? "Placing..." : "Place Order"}
+          </button>
 
-      {/* QR Modal */}
-      {showQR && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-neutral-900 border border-orange-500/60 rounded-2xl p-6 text-center shadow-2xl">
-            <h3 className="text-lg font-semibold mb-2 text-orange-400">
-              Scan & Pay
-            </h3>
-            <p className="text-xs text-neutral-300 mb-3">
-              Use any UPI app to pay directly.
-            </p>
-            <img
-              src="/payment-qr.png"
-              alt="Payment QR"
-              className="mx-auto mb-3 rounded-lg border border-neutral-700"
-              width="200"
-            />
-            <button
-              onClick={() => setShowQR(false)}
-              className="mt-2 text-xs px-4 py-2 rounded-full bg-emerald-500 text-black font-semibold hover:bg-emerald-400 transition"
-            >
-              ✅ I Have Paid
-            </button>
-          </div>
-        </div>
-      )}
+          <button
+            onClick={() => setCart([])}
+            className="w-full mt-2 border py-2 rounded-xl text-xs"
+          >
+            Clear Cart
+          </button>
+        </aside>
+      </main>
     </div>
   );
 }

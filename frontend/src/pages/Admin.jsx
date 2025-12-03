@@ -12,7 +12,7 @@ import {
   Cell,
 } from "recharts";
 
-const PIE_COLORS = ["#fb923c", "#f97316", "#fed7aa", "#facc15", "#22c55e"];
+const PIE_COLORS = ["#fb923c", "#22c55e", "#3b82f6", "#a855f7", "#eab308"];
 
 export default function Admin() {
   const [orders, setOrders] = useState([]);
@@ -26,11 +26,20 @@ export default function Admin() {
   });
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [editCart, setEditCart] = useState([]);
+  const [dark, setDark] = useState(false);
 
+  // ---- LOAD DATA ----
   const load = async () => {
-    const o = await fetch("http://localhost:5000/orders").then((r) => r.json());
-    const r = await fetch("http://localhost:5000/reports").then((r) => r.json());
-    const m = await fetch("http://localhost:5000/items").then((r) => r.json());
+    const [ordersRes, reportsRes, itemsRes] = await Promise.all([
+      fetch("http://localhost:5000/orders"),
+      fetch("http://localhost:5000/reports"),
+      fetch("http://localhost:5000/items"),
+    ]);
+
+    const o = await ordersRes.json();
+    const r = await reportsRes.json();
+    const m = await itemsRes.json();
+
     setOrders(o);
     setReports(r);
     setMenuItems(m);
@@ -42,16 +51,22 @@ export default function Admin() {
     return () => clearInterval(id);
   }, []);
 
+  // ---- DERIVED STATS ----
+  const totalOrders = orders.length;
+  const paidOrders = orders.filter((o) => o.paymentStatus === "Paid").length;
+  const totalRevenue = orders
+    .filter((o) => o.paymentStatus === "Paid")
+    .reduce((sum, o) => sum + o.cart.reduce((s, i) => s + i.price, 0), 0);
+  const pendingOrders = orders.filter(
+    (o) => o.status !== "Served" && o.status !== "Cancelled"
+  ).length;
+
   const dailyData = Object.entries(reports.daily).map(([date, total]) => ({
     date,
     total,
   }));
-  const monthlyData = Object.entries(reports.monthly).map(([month, total]) => ({
-    month,
-    total,
-  }));
 
-  // Pie data for most ordered items
+  // Pie chart: most ordered items
   const itemCounts = {};
   orders
     .filter((o) => o.paymentStatus === "Paid")
@@ -65,6 +80,7 @@ export default function Admin() {
     value,
   }));
 
+  // ---- MENU MANAGEMENT ----
   const handleAddItem = async (e) => {
     e.preventDefault();
     await fetch("http://localhost:5000/items", {
@@ -81,6 +97,7 @@ export default function Admin() {
     load();
   };
 
+  // ---- BILLING RECEIPT (KEEPING AS IS) ----
   const printBill = (o) => {
     const amount = o.cart.reduce((s, i) => s + i.price, 0);
     const win = window.open("", "_blank");
@@ -129,13 +146,12 @@ export default function Admin() {
               </thead>
               <tbody>
                 ${o.cart
-                  .map(
-                    (i) =>
-                      `<tr><td>${i.name}</td><td>₹${i.price}</td></tr>`
-                  )
+                  .map((i) => `<tr><td>${i.name}</td><td>₹${i.price}</td></tr>`)
                   .join("")}
                 <tr class="total-row"><td>Total</td><td>₹${amount}</td></tr>
-                <tr><td>Amount paid</td><td>₹${o.paymentStatus === "Paid" ? amount : 0}</td></tr>
+                <tr><td>Amount paid</td><td>₹${
+                  o.paymentStatus === "Paid" ? amount : 0
+                }</td></tr>
               </tbody>
             </table>
 
@@ -150,6 +166,7 @@ export default function Admin() {
     win.print();
   };
 
+  // ---- ORDER EDITING ----
   const startEditOrder = (index) => {
     setSelectedIndex(index);
     setEditCart(orders[index].cart);
@@ -193,42 +210,123 @@ export default function Admin() {
     });
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-neutral-950 to-black text-white p-4">
-      <h1 className="text-3xl font-bold mb-4 text-orange-400">
-        Bachelor&apos;s Hub • Admin
-      </h1>
+  // ---- THEME HELPERS ----
+  const bgClass = dark
+    ? "bg-slate-950 text-slate-50"
+    : "bg-slate-100 text-slate-900";
+  const cardClass = dark
+    ? "bg-slate-900 border border-slate-700"
+    : "bg-white border border-slate-200";
+  const mutedText = dark ? "text-slate-400" : "text-slate-500";
 
-      {/* Top: charts */}
-      <div className="grid lg:grid-cols-3 gap-4 mb-6">
-        <div className="bg-neutral-900/90 border border-orange-500/40 rounded-2xl p-4 col-span-2">
-          <h2 className="text-sm font-semibold mb-2">Daily Revenue (Paid)</h2>
-          {dailyData.length === 0 ? (
-            <p className="text-xs text-neutral-400">
-              No paid orders yet today.
+  return (
+    <div className={`min-h-screen ${bgClass} flex`}>
+      {/* 🧭 SIDEBAR */}
+      <aside
+        className={`w-56 lg:w-64 py-6 px-4 flex flex-col gap-6 border-r ${
+          dark ? "border-slate-800" : "border-slate-200 bg-white"
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <div className="h-9 w-9 rounded-2xl bg-orange-500 flex items-center justify-center text-black font-extrabold">
+            BH
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-orange-400">
+              Admin
             </p>
-          ) : (
+            <p className="font-semibold text-sm">Bachelor&apos;s Hub</p>
+          </div>
+        </div>
+
+        <nav className="space-y-1 text-sm">
+          <p className={`${mutedText} text-[11px] uppercase tracking-wide`}>
+            Menu
+          </p>
+          <button className="w-full text-left px-3 py-2 rounded-xl bg-orange-500/10 text-orange-400 font-semibold">
+            Dashboard
+          </button>
+          <button className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-800/40">
+            Orders
+          </button>
+          <button className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-800/40">
+            Menu Items
+          </button>
+          <button className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-800/40">
+            Reports
+          </button>
+        </nav>
+
+        <div className="mt-auto">
+          <button
+            onClick={() => setDark((d) => !d)}
+            className="w-full text-xs px-3 py-2 rounded-xl flex items-center justify-between border border-slate-600 bg-slate-900/60"
+          >
+            <span>Theme</span>
+            <span>{dark ? "🌙 Dark" : "☀ Light"}</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* 📊 MAIN CONTENT */}
+      <main className="flex-1 p-4 lg:p-6">
+        {/* Top line */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className={`text-xs ${mutedText}`}>Overview</p>
+            <h1 className="text-2xl font-bold">Dashboard</h1>
+          </div>
+          <p className={`text-xs ${mutedText}`}>
+            Total Orders:{" "}
+            <span className="font-semibold text-orange-400">{totalOrders}</span>
+          </p>
+        </div>
+
+        {/* STATS CARDS */}
+        <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className={`${cardClass} rounded-2xl p-4`}>
+            <p className={`text-xs ${mutedText}`}>Total Revenue</p>
+            <p className="text-xl font-bold mt-1">₹{totalRevenue}</p>
+          </div>
+          <div className={`${cardClass} rounded-2xl p-4`}>
+            <p className={`text-xs ${mutedText}`}>Total Orders</p>
+            <p className="text-xl font-bold mt-1">{totalOrders}</p>
+          </div>
+          <div className={`${cardClass} rounded-2xl p-4`}>
+            <p className={`text-xs ${mutedText}`}>Paid Orders</p>
+            <p className="text-xl font-bold mt-1 text-emerald-400">
+              {paidOrders}
+            </p>
+          </div>
+          <div className={`${cardClass} rounded-2xl p-4`}>
+            <p className={`text-xs ${mutedText}`}>Active / Pending</p>
+            <p className="text-xl font-bold mt-1 text-yellow-300">
+              {pendingOrders}
+            </p>
+          </div>
+        </section>
+
+        {/* CHARTS */}
+        <section className="grid lg:grid-cols-2 gap-4 mb-6">
+          <div className={`${cardClass} rounded-2xl p-4`}>
+            <h2 className="text-sm font-semibold mb-2">Daily Revenue</h2>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dailyData}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#e5e7eb" }} />
-                  <YAxis tick={{ fontSize: 10, fill: "#e5e7eb" }} />
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip />
                   <Bar dataKey="total" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          )}
-        </div>
+          </div>
 
-        <div className="bg-neutral-900/90 border border-orange-500/40 rounded-2xl p-4">
-          <h2 className="text-sm font-semibold mb-2">
-            Most Ordered Items (Paid)
-          </h2>
-          {pieData.length === 0 ? (
-            <p className="text-xs text-neutral-400">No data yet.</p>
-          ) : (
+          <div className={`${cardClass} rounded-2xl p-4`}>
+            <h2 className="text-sm font-semibold mb-2">
+              Most Ordered Items (Paid)
+            </h2>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -236,210 +334,222 @@ export default function Admin() {
                     data={pieData}
                     dataKey="value"
                     nameKey="name"
-                    outerRadius={70}
+                    outerRadius={80}
                   >
                     {pieData.map((_, i) => (
-                      <Cell key={i} />
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Menu Management */}
-      <div className="grid md:grid-cols-2 gap-4 mb-6">
-        <div className="bg-neutral-900/90 border border-orange-500/40 rounded-2xl p-4">
-          <h2 className="text-sm font-semibold mb-3">Menu Items</h2>
-          <div className="space-y-2 max-h-56 overflow-y-auto text-xs">
-            {menuItems.map((m) => (
-              <div
-                key={m.id}
-                className="flex justify-between items-center bg-neutral-800/80 rounded-xl px-3 py-2"
-              >
-                <div>
-                  <p className="font-semibold">{m.name}</p>
-                  <p className="text-[11px] text-neutral-400">
-                    ₹{m.price} • {m.category}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleDeleteItem(m.id)}
-                  className="text-[11px] px-2 py-1 rounded-full bg-red-500/90 text-white hover:bg-red-400"
-                >
-                  Delete
-                </button>
-              </div>
-            ))}
           </div>
-        </div>
+        </section>
 
-        <div className="bg-neutral-900/90 border border-orange-500/40 rounded-2xl p-4">
-          <h2 className="text-sm font-semibold mb-3">Add New Item</h2>
-          <form onSubmit={handleAddItem} className="space-y-2 text-xs">
-            <input
-              className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2"
-              placeholder="Item name"
-              value={newItem.name}
-              onChange={(e) =>
-                setNewItem((n) => ({ ...n, name: e.target.value }))
-              }
-            />
-            <input
-              className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2"
-              placeholder="Price"
-              type="number"
-              value={newItem.price}
-              onChange={(e) =>
-                setNewItem((n) => ({ ...n, price: e.target.value }))
-              }
-            />
-            <input
-              className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2"
-              placeholder="Image URL (optional)"
-              value={newItem.imageUrl}
-              onChange={(e) =>
-                setNewItem((n) => ({ ...n, imageUrl: e.target.value }))
-              }
-            />
-            <input
-              className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2"
-              placeholder="Category (e.g. Pizza, Beverage)"
-              value={newItem.category}
-              onChange={(e) =>
-                setNewItem((n) => ({ ...n, category: e.target.value }))
-              }
-            />
-            <button
-              type="submit"
-              className="mt-1 bg-orange-500 text-black font-semibold px-3 py-2 rounded-lg hover:bg-orange-400"
-            >
-              Save Item
-            </button>
-          </form>
-        </div>
-      </div>
-
-      {/* Orders list */}
-      <h2 className="text-lg font-semibold mb-2">All Orders</h2>
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-16">
-        {orders.map((o, i) => {
-          const amount = o.cart.reduce((s, item) => s + item.price, 0);
-          const isSelected = selectedIndex === i;
-          return (
-            <div
-              key={i}
-              className={`bg-neutral-900/90 p-4 rounded-2xl border ${
-                isSelected ? "border-orange-400" : "border-neutral-700"
-              }`}
-            >
-              <div className="flex justify-between items-center mb-2">
-                <p className="text-sm font-semibold">
-                  Table {o.table}
-                  <span className="block text-[10px] text-neutral-400">
-                    Bill #{o.billNo}
-                  </span>
-                </p>
-                <button
-                  onClick={() => printBill(o)}
-                  className="text-[11px] px-2 py-1 rounded-full bg-neutral-800 border border-neutral-600 hover:border-orange-400"
+        {/* MENU + ADD ITEM */}
+        <section className="grid md:grid-cols-2 gap-4 mb-6">
+          <div className={`${cardClass} rounded-2xl p-4`}>
+            <h2 className="text-sm font-semibold mb-2">Menu Items</h2>
+            <div className="space-y-2 max-h-64 overflow-y-auto text-sm">
+              {menuItems.map((m) => (
+                <div
+                  key={m.id}
+                  className={`flex justify-between items-center px-3 py-2 rounded-xl ${
+                    dark ? "bg-slate-800" : "bg-slate-50"
+                  }`}
                 >
-                  🧾 Print
-                </button>
-              </div>
-
-              <p className="text-xs">
-                Status:{" "}
-                <span className="font-semibold text-orange-300">
-                  {o.status}
-                </span>
-              </p>
-              <p className="text-xs">
-                Payment:{" "}
-                <span
-                  className={
-                    o.paymentStatus === "Paid"
-                      ? "text-emerald-400 font-semibold"
-                      : "text-yellow-300 font-semibold"
-                  }
-                >
-                  {o.paymentStatus}
-                </span>
-              </p>
-              <p className="text-xs mb-2 text-neutral-300">Total: ₹{amount}</p>
-
-              <div className="text-[11px] max-h-16 overflow-y-auto mb-2">
-                {o.cart.map((c, j) => (
-                  <p key={j}>• {c.name}</p>
-                ))}
-              </div>
-
-              <div className="flex gap-2 text-[11px]">
-                <button
-                  onClick={() => startEditOrder(i)}
-                  className="flex-1 px-2 py-1 rounded-full bg-orange-500 text-black font-semibold hover:bg-orange-400"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => updateOrderField("status", "Cancelled")}
-                  className="flex-1 px-2 py-1 rounded-full bg-red-500/90 text-white hover:bg-red-400"
-                >
-                  Cancel
-                </button>
-              </div>
+                  <div>
+                    <p className="font-semibold">{m.name}</p>
+                    <p className={`text-[11px] ${mutedText}`}>
+                      ₹{m.price} • {m.category}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteItem(m.id)}
+                    className="text-xs px-3 py-1 rounded-full bg-red-500 text-white"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
             </div>
-          );
-        })}
-      </div>
+          </div>
 
-      {/* Bottom edit bar for selected order */}
-      {selectedIndex !== null && orders[selectedIndex] && (
-        <div className="fixed bottom-0 left-0 right-0 bg-neutral-900 border-t border-neutral-700 p-3 flex flex-wrap items-center gap-3 text-[11px]">
-          <span className="text-neutral-300">
-            Editing Bill #{orders[selectedIndex].billNo}
-          </span>
+          <div className={`${cardClass} rounded-2xl p-4`}>
+            <h2 className="text-sm font-semibold mb-2">Add New Item</h2>
+            <form onSubmit={handleAddItem} className="space-y-2 text-sm">
+              <input
+                className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
+                placeholder="Item name"
+                value={newItem.name}
+                onChange={(e) =>
+                  setNewItem((n) => ({ ...n, name: e.target.value }))
+                }
+              />
+              <input
+                className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
+                placeholder="Price"
+                type="number"
+                value={newItem.price}
+                onChange={(e) =>
+                  setNewItem((n) => ({ ...n, price: e.target.value }))
+                }
+              />
+              <input
+                className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
+                placeholder="Image URL (optional)"
+                value={newItem.imageUrl}
+                onChange={(e) =>
+                  setNewItem((n) => ({ ...n, imageUrl: e.target.value }))
+                }
+              />
+              <input
+                className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
+                placeholder="Category (e.g. Pizza, Drinks)"
+                value={newItem.category}
+                onChange={(e) =>
+                  setNewItem((n) => ({ ...n, category: e.target.value }))
+                }
+              />
+              <button
+                type="submit"
+                className="mt-1 bg-orange-500 text-black px-4 py-2 rounded-lg font-semibold"
+              >
+                Save Item
+              </button>
+            </form>
+          </div>
+        </section>
 
-          <select
-            defaultValue={orders[selectedIndex].status}
-            onChange={(e) => updateOrderField("status", e.target.value)}
-            className="bg-neutral-800 border border-neutral-600 rounded px-2 py-1"
+        {/* ORDERS */}
+        <section className="mb-16">
+          <h2 className="text-sm font-semibold mb-2">All Orders</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {orders.map((o, i) => {
+              const amount = o.cart.reduce((s, item) => s + item.price, 0);
+              const isSelected = selectedIndex === i;
+              return (
+                <div
+                  key={i}
+                  className={`${cardClass} rounded-2xl p-4 ${
+                    isSelected ? "ring-2 ring-orange-400" : ""
+                  }`}
+                >
+                  <div className="flex justify-between items-center mb-1">
+                    <p className="font-semibold text-sm">
+                      Table {o.table}
+                      <span className={`block text-[11px] ${mutedText}`}>
+                        Bill #{o.billNo}
+                      </span>
+                    </p>
+                    <button
+                      onClick={() => printBill(o)}
+                      className="text-[11px] px-2 py-1 rounded-full border border-slate-500"
+                    >
+                      🧾 Print
+                    </button>
+                  </div>
+
+                  <p className="text-xs">
+                    Status:{" "}
+                    <span className="font-semibold text-orange-300">
+                      {o.status}
+                    </span>
+                  </p>
+                  <p className="text-xs">
+                    Payment:{" "}
+                    <span
+                      className={
+                        o.paymentStatus === "Paid"
+                          ? "text-emerald-400 font-semibold"
+                          : "text-yellow-300 font-semibold"
+                      }
+                    >
+                      {o.paymentStatus}
+                    </span>
+                  </p>
+                  <p className="text-xs mt-1">
+                    Total:{" "}
+                    <span className="font-semibold text-orange-400">
+                      ₹{amount}
+                    </span>
+                  </p>
+
+                  <div
+                    className={`text-[11px] mt-2 max-h-16 overflow-y-auto ${mutedText}`}
+                  >
+                    {o.cart.map((c, j) => (
+                      <p key={j}>• {c.name}</p>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2 mt-3 text-[11px]">
+                    <button
+                      onClick={() => startEditOrder(i)}
+                      className="flex-1 px-2 py-1 rounded-full bg-orange-500 text-black font-semibold"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => updateOrderField("status", "Cancelled")}
+                      className="flex-1 px-2 py-1 rounded-full bg-red-500/80 text-white"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* BOTTOM EDIT BAR */}
+        {selectedIndex !== null && orders[selectedIndex] && (
+          <div
+            className={`fixed bottom-0 left-0 right-0 ${
+              dark ? "bg-slate-900" : "bg-white"
+            } border-t border-slate-700 px-4 py-3 flex flex-wrap items-center gap-3 text-xs`}
           >
-            <option value="Pending">Pending</option>
-            <option value="Preparing">Preparing</option>
-            <option value="Ready">Ready</option>
-            <option value="Served">Served</option>
-            <option value="Cancelled">Cancelled</option>
-          </select>
+            <span className="font-semibold">
+              Editing Bill #{orders[selectedIndex].billNo}
+            </span>
 
-          <select
-            defaultValue={orders[selectedIndex].paymentStatus}
-            onChange={(e) =>
-              updateOrderField("paymentStatus", e.target.value)
-            }
-            className="bg-neutral-800 border border-neutral-600 rounded px-2 py-1"
-          >
-            <option value="Unpaid">Unpaid</option>
-            <option value="Paid">Paid</option>
-          </select>
+            <select
+              defaultValue={orders[selectedIndex].status}
+              onChange={(e) => updateOrderField("status", e.target.value)}
+              className="border border-slate-500 rounded px-2 py-1 bg-transparent"
+            >
+              <option>Pending</option>
+              <option>Preparing</option>
+              <option>Ready</option>
+              <option>Served</option>
+              <option>Cancelled</option>
+            </select>
 
-          {/* Edit items */}
-          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              defaultValue={orders[selectedIndex].paymentStatus}
+              onChange={(e) =>
+                updateOrderField("paymentStatus", e.target.value)
+              }
+              className="border border-slate-500 rounded px-2 py-1 bg-transparent"
+            >
+              <option>Unpaid</option>
+              <option>Paid</option>
+            </select>
+
             <select
               onChange={(e) => {
                 addItemToEditCart(e.target.value);
                 e.target.value = "";
               }}
+              className="border border-slate-500 rounded px-2 py-1 bg-transparent"
               defaultValue=""
-              className="bg-neutral-800 border border-neutral-600 rounded px-2 py-1"
             >
-              <option value="">Add item…</option>
+              <option value="">Add Item…</option>
               {menuItems.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.name} (₹{m.price})
+                  {m.name}
                 </option>
               ))}
             </select>
@@ -449,7 +559,7 @@ export default function Admin() {
                 <button
                   key={idx}
                   onClick={() => removeItemFromEditCart(idx)}
-                  className="px-2 py-1 rounded-full bg-neutral-800 border border-neutral-600 text-[10px]"
+                  className="px-2 py-1 rounded-full bg-slate-700 text-xs"
                 >
                   {i.name} ✕
                 </button>
@@ -458,7 +568,7 @@ export default function Admin() {
 
             <button
               onClick={saveEditedCart}
-              className="px-3 py-1 rounded-full bg-emerald-500 text-black font-semibold hover:bg-emerald-400"
+              className="px-3 py-1 rounded-full bg-emerald-500 text-black font-semibold"
             >
               Save Items
             </button>
@@ -468,13 +578,13 @@ export default function Admin() {
                 setSelectedIndex(null);
                 setEditCart([]);
               }}
-              className="px-2 py-1 rounded-full bg-neutral-800 border border-neutral-600"
+              className="px-3 py-1 rounded-full bg-slate-600 text-slate-50"
             >
               Close
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   );
 }

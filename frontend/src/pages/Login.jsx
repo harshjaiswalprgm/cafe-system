@@ -36,66 +36,110 @@ export default function Login() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-black via-neutral-900 to-black">
-      <div className="bg-neutral-900/90 border border-orange-500/50 rounded-3xl shadow-2xl p-8 w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-1 text-center text-orange-400">
-          Bachelor&apos;s Hub
-        </h1>
-        <p className="text-sm text-neutral-300 mb-6 text-center">
-          Control Panel Login
-        </p>
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs mb-1 text-neutral-300">
-              Login as
-            </label>
-            <select
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-            >
-              <option value="admin">Admin</option>
-              <option value="kitchen">Kitchen</option>
-            </select>
-          </div>
+      {/* ✅ PARALLAX ZOOM BACKGROUND */}
+      <div
+        className="absolute inset-0 bg-cover bg-center animate-parallax"
+        style={{
+          backgroundImage:
+            "url('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1920&q=80')",
+        }}
+      />
 
-          <div>
-            <label className="block text-xs mb-1 text-neutral-300">
-              Password
-            </label>
-            <input
-              type="password"
-              placeholder={username === "admin" ? "admin123" : "kitchen123"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-            />
-          </div>
+      {/* ✅ Dark overlay for contrast */}
+      <div className="absolute inset-0 bg-black/50" />
 
-          {error && (
-            <p className="text-red-400 text-xs bg-red-900/40 px-3 py-2 rounded-lg border border-red-600">
-              {error}
-            </p>
-          )}
+      {/* ✅ Glass Main Card */}
+      <div className="relative z-10 w-[95%] max-w-4xl h-[520px] rounded-[28px] bg-white/20 backdrop-blur-2xl shadow-2xl flex overflow-hidden border border-white/30">
 
-          <button
-            type="submit"
-            className="w-full bg-orange-500 hover:bg-orange-400 text-black font-semibold py-2 rounded-xl mt-2 transition transform hover:-translate-y-0.5"
-          >
-            Login
-          </button>
-        </form>
-
-        <div className="mt-4 text-[11px] text-neutral-400 space-y-1">
-          <p>
-            Admin: <b>admin / admin123</b>
-          </p>
-          <p>
-            Kitchen: <b>kitchen / kitchen123</b>
+        {/* ✅ LEFT BRAND PANEL */}
+        <div className="hidden md:flex w-1/2 flex-col items-center justify-center bg-black/30">
+          <h1 className="text-4xl font-extrabold text-orange-400 tracking-wide mb-3">
+            Bachelor&apos;s Hub
+          </h1>
+          <p className="text-sm text-neutral-200 tracking-wide">
+            Smart Cafe Management System
           </p>
         </div>
+
+        {/* ✅ RIGHT LOGIN PANEL */}
+        <div className="w-full md:w-1/2 bg-white/95 p-10 flex flex-col justify-center">
+          <h2 className="text-2xl font-bold text-neutral-900 mb-1">
+            Welcome Back
+          </h2>
+          <p className="text-sm text-neutral-500 mb-8">
+            Login to control your cafe
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+
+            {/* ✅ ROLE */}
+            <div>
+              <label className="text-xs font-semibold text-neutral-700">
+                Login as
+              </label>
+              <select
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full mt-1 rounded-xl border border-neutral-400 bg-white px-4 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="admin">Admin</option>
+                <option value="kitchen">Kitchen</option>
+              </select>
+            </div>
+
+            {/* ✅ PASSWORD */}
+            <div>
+              <label className="text-xs font-semibold text-neutral-700">
+                Password
+              </label>
+              <input
+                type="password"
+                placeholder={username === "admin" ? "admin123" : "kitchen123"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full mt-1 rounded-xl border border-neutral-400 bg-white px-4 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+
+            {/* ✅ ERROR */}
+            {error && (
+              <p className="text-red-600 text-xs bg-red-100 px-3 py-2 rounded-lg border border-red-300">
+                {error}
+              </p>
+            )}
+
+            {/* ✅ BUTTON */}
+            <button
+              type="submit"
+              className="w-full mt-2 bg-black text-white hover:bg-orange-500 py-2 rounded-xl font-semibold transition"
+            >
+              Continue
+            </button>
+          </form>
+
+          {/* ✅ TEST CREDENTIALS */}
+          <div className="mt-6 text-[11px] text-neutral-600 space-y-1">
+            <p>Admin: <b>admin / admin123</b></p>
+            <p>Kitchen: <b>kitchen / kitchen123</b></p>
+          </div>
+        </div>
       </div>
+
+      {/* ✅ PARALLAX ANIMATION CSS */}
+      <style>{`
+        @keyframes parallax {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+          100% { transform: scale(1); }
+        }
+
+        .animate-parallax {
+          animation: parallax 25s ease-in-out infinite;
+        }
+      `}</style>
+
     </div>
   );
 }

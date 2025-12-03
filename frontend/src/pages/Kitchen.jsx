@@ -1,11 +1,39 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function Kitchen() {
   const [orders, setOrders] = useState([]);
+  const [dark, setDark] = useState(true);
+  const [highlightIds, setHighlightIds] = useState([]);
+  const audioRef = useRef(null);
+  const prevIdsRef = useRef([]);
 
   const loadOrders = async () => {
     const res = await fetch("http://localhost:5000/orders");
-    const data = await res.json();
+    let data = await res.json();
+
+    // ✅ AUTO REMOVE SERVED AFTER 5 MINUTES
+    const now = Date.now();
+    data = data.filter((order) => {
+      if (order.status === "Served" && order.servedAt) {
+        return now - new Date(order.servedAt).getTime() < 5 * 60 * 1000;
+      }
+      return true;
+    });
+
+    const newIds = data.map((o) => o.billNo);
+    const prevIds = prevIdsRef.current;
+    const justAdded = newIds.filter((id) => !prevIds.includes(id));
+
+    if (justAdded.length > 0) {
+      audioRef.current?.play().catch(() => {});
+      setHighlightIds((prev) => [...prev, ...justAdded]);
+
+      setTimeout(() => {
+        setHighlightIds((prev) => prev.filter((id) => !justAdded.includes(id)));
+      }, 2000);
+    }
+
+    prevIdsRef.current = newIds;
     setOrders(data);
   };
 
@@ -15,11 +43,22 @@ export default function Kitchen() {
     return () => clearInterval(interval);
   }, []);
 
+  // ✅ FULLSCREEN AUTO
+  useEffect(() => {
+    if (orders.length > 0 && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    }
+  }, [orders.length]);
+
   const updateStatus = (index, status) => {
     fetch("http://localhost:5000/update-status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ index, status }),
+      body: JSON.stringify({
+        index,
+        status,
+        servedAt: status === "Served" ? new Date() : null,
+      }),
     });
   };
 
@@ -31,119 +70,160 @@ export default function Kitchen() {
     });
   };
 
+  // ✅ THEME SYSTEM
+  const bgClass = dark
+    ? "bg-[#0c0c0c] text-white"
+    : "bg-slate-100 text-black";
+
+  const cardBase = dark
+    ? "bg-[#151515] border border-[#2a2a2a] text-white"
+    : "bg-white border border-slate-300 text-black";
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-neutral-900 to-black text-white p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold text-orange-400">
-          👨‍🍳 Bachelor&apos;s Hub — Kitchen
-        </h1>
-        <span className="text-xs px-3 py-1 rounded-full bg-orange-500 text-black font-semibold">
-          LIVE
-        </span>
+    <div className={`min-h-screen ${bgClass} p-4 lg:p-6`}>
+      <audio ref={audioRef} src="/new-order.mp3" preload="auto" />
+
+      {/* ✅ TOP BAR */}
+      <div className="max-w-7xl mx-auto flex items-center justify-between mb-5">
+        <div>
+          <p className="text-xs tracking-widest uppercase text-orange-500">
+            Bachelor&apos;s Hub
+          </p>
+          <h1 className="text-2xl lg:text-3xl font-extrabold flex items-center gap-3 text-black dark:text-white">
+            👨‍🍳 Kitchen
+            <span className="text-[11px] px-3 py-1 rounded-full bg-orange-500 text-black font-bold">
+              LIVE
+            </span>
+          </h1>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setDark((d) => !d)}
+            className="px-4 py-1.5 rounded-full text-xs font-bold bg-orange-500 text-black"
+          >
+            {dark ? "☀ Light" : "🌙 Dark"}
+          </button>
+
+          <span className="text-xs font-bold text-black dark:text-orange-400">
+            Orders: {orders.length}
+          </span>
+        </div>
       </div>
 
-      {/* Orders Grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {/* ✅ ORDERS GRID */}
+      <div className="max-w-7xl mx-auto grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         {orders.map((order, index) => {
-          const totalAmount = order.cart.reduce(
+          const amount = order.cart.reduce(
             (sum, item) => sum + item.price,
             0
           );
+          const isNew = highlightIds.includes(order.billNo);
 
-          const statusStyle =
-            order.status === "Pending"
-              ? "bg-yellow-500/20 text-yellow-300 border-yellow-500"
-              : order.status === "Preparing"
-              ? "bg-blue-500/20 text-blue-300 border-blue-500"
-              : order.status === "Ready"
-              ? "bg-emerald-500/20 text-emerald-300 border-emerald-500"
-              : order.status === "Served"
-              ? "bg-gray-500/20 text-gray-300 border-gray-500"
-              : "bg-red-500/20 text-red-300 border-red-500";
+          let statusClasses =
+            "bg-slate-400/30 text-black border border-slate-400";
+
+          if (order.status === "Pending") {
+            statusClasses =
+              "bg-yellow-300 text-black border border-yellow-500";
+          } else if (order.status === "Preparing") {
+            statusClasses =
+              "bg-blue-400 text-black border border-blue-600 status-preparing";
+          } else if (order.status === "Ready") {
+            statusClasses =
+              "bg-green-400 text-black border border-green-600";
+          } else if (order.status === "Served") {
+            statusClasses =
+              "bg-slate-300 text-black border border-slate-500";
+          } else if (order.status === "Cancelled") {
+            statusClasses =
+              "bg-red-400 text-black border border-red-600";
+          }
+
+          const paid =
+            order.paymentStatus &&
+            order.paymentStatus.toLowerCase() === "paid";
 
           return (
             <div
-              key={index}
-              className="bg-neutral-900/90 border border-neutral-700 rounded-3xl p-5 shadow-xl hover:border-orange-400 transition"
+              key={order.billNo ?? index}
+              className={`${cardBase} rounded-3xl p-4 shadow-xl flex flex-col justify-between gap-3 ${
+                isNew ? "card-new" : ""
+              }`}
             >
-              {/* Top */}
-              <div className="flex items-center justify-between mb-3">
+              {/* HEADER */}
+              <div className="flex justify-between items-start gap-2">
                 <div>
-                  <h2 className="text-lg font-bold text-orange-300">
-                    Table {order.table}
-                  </h2>
-                  <p className="text-xs text-neutral-400">
+                  <p className="text-xs opacity-70">Table</p>
+                  <p className="text-2xl font-black text-orange-500">
+                    #{order.table}
+                  </p>
+                  <p className="text-[11px] opacity-60">
                     Bill #{order.billNo}
                   </p>
                 </div>
 
                 <span
-                  className={`text-[11px] px-3 py-1 rounded-full border ${statusStyle}`}
+                  className={`text-[11px] px-3 py-1 rounded-full font-bold ${statusClasses}`}
                 >
                   {order.status}
                 </span>
               </div>
 
-              {/* Items */}
-              <div className="space-y-1 text-sm text-neutral-200 max-h-32 overflow-y-auto mb-3">
+              {/* ITEMS */}
+              <div className="text-sm max-h-32 overflow-y-auto space-y-1 pr-1">
                 {order.cart.map((item, i) => (
-                  <div key={i} className="flex justify-between text-xs">
+                  <div className="flex justify-between" key={i}>
                     <span>• {item.name}</span>
-                    <span>₹{item.price}</span>
+                    <span className="opacity-70">₹{item.price}</span>
                   </div>
                 ))}
               </div>
 
-              {/* Payment */}
-              <div className="text-xs mb-3">
-                <p>
-                  Payment:{" "}
+              {/* FOOTER */}
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between font-bold">
+                  <span>Amount</span>
+                  <span className="text-orange-500">₹{amount}</span>
+                </div>
+
+                <div className="flex justify-between font-bold">
+                  <span>Payment</span>
                   <span
-                    className={
-                      order.paymentStatus === "Paid"
-                        ? "text-emerald-400 font-semibold"
-                        : "text-yellow-300 font-semibold"
-                    }
+                    className={paid ? "text-green-600" : "text-yellow-600"}
                   >
                     {order.paymentStatus}
                   </span>
-                </p>
-                <p className="mt-1 text-xs text-neutral-300">
-                  Total:{" "}
-                  <span className="font-bold text-orange-400">
-                    ₹{totalAmount}
-                  </span>
-                </p>
+                </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-wrap gap-2 text-[11px]">
+              {/* ACTION BUTTONS */}
+              <div className="flex flex-wrap gap-2 text-xs">
                 <button
                   onClick={() => updateStatus(index, "Preparing")}
-                  className="flex-1 px-3 py-1 rounded-full bg-yellow-500/30 border border-yellow-400 text-yellow-200 hover:bg-yellow-500/40"
+                  className="flex-1 px-3 py-1 rounded-full bg-yellow-400 text-black font-bold"
                 >
                   Preparing
                 </button>
 
                 <button
                   onClick={() => updateStatus(index, "Ready")}
-                  className="flex-1 px-3 py-1 rounded-full bg-blue-500/30 border border-blue-400 text-blue-200 hover:bg-blue-500/40"
+                  className="flex-1 px-3 py-1 rounded-full bg-blue-400 text-black font-bold"
                 >
                   Ready
                 </button>
 
                 <button
                   onClick={() => updateStatus(index, "Served")}
-                  className="flex-1 px-3 py-1 rounded-full bg-emerald-500/30 border border-emerald-400 text-emerald-200 hover:bg-emerald-500/40"
+                  className="flex-1 px-3 py-1 rounded-full bg-green-400 text-black font-bold"
                 >
                   Served
                 </button>
 
-                {order.paymentStatus === "Unpaid" && (
+                {!paid && (
                   <button
                     onClick={() => markPaid(index)}
-                    className="w-full px-3 py-1 rounded-full bg-orange-500 text-black font-semibold hover:bg-orange-400"
+                    className="w-full px-3 py-1 rounded-full bg-orange-500 text-black font-bold"
                   >
                     ✅ Mark Paid
                   </button>
@@ -154,12 +234,33 @@ export default function Kitchen() {
         })}
       </div>
 
-      {/* Empty State */}
       {orders.length === 0 && (
-        <div className="text-center mt-20 text-neutral-400 text-sm">
+        <p className="mt-20 text-center text-sm opacity-70">
           No live orders right now 🍽️
-        </div>
+        </p>
       )}
+
+      {/* ✅ ANIMATIONS */}
+      <style>
+        {`
+          .card-new {
+            animation: pop 0.6s ease-out;
+          }
+          @keyframes pop {
+            0% { transform: scale(0.9); box-shadow: 0 0 0 rgba(255,115,22,0); }
+            50% { transform: scale(1.05); box-shadow: 0 20px 50px rgba(255,115,22,0.6); }
+            100% { transform: scale(1); box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
+          }
+
+          .status-preparing {
+            animation: pulse 1.2s infinite;
+          }
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+          }
+        `}
+      </style>
     </div>
   );
 }
