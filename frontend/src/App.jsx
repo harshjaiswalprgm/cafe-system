@@ -3,6 +3,9 @@ import Menu from "./pages/Menu";
 import Kitchen from "./pages/Kitchen";
 import Admin from "./pages/Admin";
 import Login from "./pages/Login";
+import StockManager from "./pages/StockManager";
+import Reports from "./pages/Reports";
+
 
 function ProtectedRoute({ allowedRoles, children }) {
   const location = useLocation();
@@ -19,6 +22,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-900 via-black to-neutral-950 text-white">
       <Routes>
+        <Route path="/admin/stock" element={<StockManager />} /> // new route added here for stockManager
+         <Route path="/admin/reports" element={<Reports />} />
+
         <Route path="/" element={<Navigate to="/menu/1" />} />
         <Route path="/menu/:table" element={<Menu />} />
         <Route

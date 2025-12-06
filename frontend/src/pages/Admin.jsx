@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
@@ -17,6 +23,10 @@ const PIE_COLORS = ["#fb923c", "#22c55e", "#3b82f6", "#a855f7", "#eab308"];
 export default function Admin() {
   const [orders, setOrders] = useState([]);
   const [reports, setReports] = useState({ daily: {}, monthly: {} });
+  const [chartType, setChartType] = useState("bar"); // bar | line | area
+  const [range, setRange] = useState("daily"); // daily | monthly
+  const [showAvatar, setShowAvatar] = useState(false);
+
   const [menuItems, setMenuItems] = useState([]);
   const [newItem, setNewItem] = useState({
     name: "",
@@ -30,24 +40,36 @@ export default function Admin() {
 
   // ---- LOAD DATA ----
   const load = async () => {
-    const [ordersRes, reportsRes, itemsRes] = await Promise.all([
-      fetch("http://localhost:5000/orders"),
-      fetch("http://localhost:5000/reports"),
-      fetch("http://localhost:5000/items"),
-    ]);
+    try {
+      const [ordersRes, reportsRes, itemsRes] = await Promise.all([
+        fetch("http://localhost:5000/orders"),
+        fetch("http://localhost:5000/reports"),
+        fetch("http://localhost:5000/items"),
+      ]);
 
-    const o = await ordersRes.json();
-    const r = await reportsRes.json();
-    const m = await itemsRes.json();
+      if (!ordersRes.ok || !reportsRes.ok || !itemsRes.ok) {
+        throw new Error("Failed to fetch data");
+      }
 
-    setOrders(o);
-    setReports(r);
-    setMenuItems(m);
+      const o = await ordersRes.json();
+      const r = await reportsRes.json();
+      const m = await itemsRes.json();
+
+      setOrders(o);
+      setReports(r);
+      setMenuItems(m);
+    } catch (err) {
+      console.error("Load error:", err);
+    }
   };
 
   useEffect(() => {
-    load();
-    const id = setInterval(load, 4000);
+    load(); // ✅ no VS Code error now
+
+    const id = setInterval(() => {
+      load();
+    }, 4000);
+
     return () => clearInterval(id);
   }, []);
 
@@ -65,6 +87,14 @@ export default function Admin() {
     date,
     total,
   }));
+  const monthlyData = Object.entries(reports.monthly || {}).map(
+    ([month, total]) => ({
+      month,
+      total,
+    })
+  );
+
+  const activeChartData = range === "daily" ? dailyData : monthlyData;
 
   // Pie chart: most ordered items
   const itemCounts = {};
@@ -228,9 +258,18 @@ export default function Admin() {
         }`}
       >
         <div className="flex items-center gap-2">
-          <div className="h-9 w-9 rounded-2xl bg-orange-500 flex items-center justify-center text-black font-extrabold">
-            BH
-          </div>
+          {/* ✅ Profile Image Button */}
+          <button
+            onClick={() => setShowAvatar(true)}
+            className="h-9 w-9 rounded-2xl bg-orange-500 overflow-hidden border-2 border-orange-400 shadow-md"
+          >
+            <img
+              src="/Screenshot 2025-12-06 160752.png"
+              alt="Harsh"
+              className="h-full w-full object-cover"
+            />
+          </button>
+
           <div>
             <p className="text-xs uppercase tracking-wide text-orange-400">
               Admin
@@ -240,22 +279,48 @@ export default function Admin() {
         </div>
 
         <nav className="space-y-1 text-sm">
-          <p className={`${mutedText} text-[11px] uppercase tracking-wide`}>
-            Menu
-          </p>
-          <button className="w-full text-left px-3 py-2 rounded-xl bg-orange-500/10 text-orange-400 font-semibold">
-            Dashboard
-          </button>
-          <button className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-800/40">
-            Orders
-          </button>
-          <button className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-800/40">
-            Menu Items
-          </button>
-          <button className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-800/40">
-            Reports
-          </button>
-        </nav>
+  <p className="text-[11px] uppercase tracking-wide text-gray-400">
+    Menu
+  </p>
+
+  <Link
+    to="/admin"
+    className="block px-3 py-2 rounded-xl bg-orange-500/10 text-orange-400 font-semibold"
+  >
+    Dashboard
+  </Link>
+
+  <Link
+    to="/admin"
+    className="block px-3 py-2 rounded-xl hover:bg-slate-800/40"
+  >
+    Orders
+  </Link>
+
+  <Link
+    to="/admin"
+    className="block px-3 py-2 rounded-xl hover:bg-slate-800/40"
+  >
+    Menu Items
+  </Link>
+
+  {/* ✅ NEW STOCK BUTTON */}
+  <Link
+    to="/admin/stock"
+    className="block px-3 py-2 rounded-xl hover:bg-slate-800/40"
+  >
+    📦 Stock Control
+  </Link>
+
+  {/* ✅ FUTURE REPORTS */}
+  <Link
+    to="/admin/reports"
+    className="block px-3 py-2 rounded-xl hover:bg-slate-800/40"
+  >
+    📊 Reports
+  </Link>
+</nav>
+
 
         <div className="mt-auto">
           <button
@@ -308,41 +373,159 @@ export default function Admin() {
 
         {/* CHARTS */}
         <section className="grid lg:grid-cols-2 gap-4 mb-6">
-          <div className={`${cardClass} rounded-2xl p-4`}>
-            <h2 className="text-sm font-semibold mb-2">Daily Revenue</h2>
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dailyData}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip />
-                  <Bar dataKey="total" />
-                </BarChart>
-              </ResponsiveContainer>
+          {/* ✅ REVENUE CHART WITH CONTROLS */}
+          <div className={`${cardClass} rounded-2xl p-4 relative`}>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold">
+                {range === "daily" ? "Daily Revenue" : "Monthly Revenue"}
+              </h2>
+
+              <div className="flex gap-2 text-xs">
+                <select
+                  value={range}
+                  onChange={(e) => setRange(e.target.value)}
+                  className="px-2 py-1 rounded bg-orange-500 text-black font-semibold"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+
+                <select
+                  value={chartType}
+                  onChange={(e) => setChartType(e.target.value)}
+                  className="px-2 py-1 rounded bg-black text-white border border-orange-400"
+                >
+                  <option value="bar">Bar</option>
+                  <option value="line">Line</option>
+                  <option value="area">Area</option>
+                </select>
+              </div>
+            </div>
+
+            {/* ✅ SAFE HEIGHT + SAFE DATA CHECK */}
+            <div style={{ width: "100%", height: 260 }}>
+              {activeChartData.length > 0 && (
+                <ResponsiveContainer width="100%" height="100%">
+                  {chartType === "bar" && (
+                    <BarChart data={activeChartData}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                      <XAxis dataKey={range === "daily" ? "date" : "month"} />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar
+                        dataKey="total"
+                        fill="#f97316"
+                        radius={[6, 6, 0, 0]}
+                      />
+                    </BarChart>
+                  )}
+
+                  {chartType === "line" && (
+                    <LineChart data={activeChartData}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                      <XAxis dataKey={range === "daily" ? "date" : "month"} />
+                      <YAxis />
+                      <Tooltip />
+                      <Line
+                        type="monotone"
+                        dataKey="total"
+                        stroke="#f97316"
+                        strokeWidth={3}
+                      />
+                    </LineChart>
+                  )}
+
+                  {chartType === "area" && (
+                    <AreaChart data={activeChartData}>
+                      <defs>
+                        <linearGradient
+                          id="colorRevenue"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="#f97316"
+                            stopOpacity={0.8}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#f97316"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                      <XAxis dataKey={range === "daily" ? "date" : "month"} />
+                      <YAxis />
+                      <Tooltip />
+                      <Area
+                        type="monotone"
+                        dataKey="total"
+                        stroke="#f97316"
+                        fill="url(#colorRevenue)"
+                      />
+                    </AreaChart>
+                  )}
+                </ResponsiveContainer>
+              )}
+
+              {/* ✅ EMPTY STATE (VERY IMPORTANT) */}
+              {activeChartData.length === 0 && (
+                <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                  No revenue data yet
+                </div>
+              )}
             </div>
           </div>
 
+          {/* ✅ MOST ORDERED ITEMS PIE (ADVANCED LOOK) */}
           <div className={`${cardClass} rounded-2xl p-4`}>
             <h2 className="text-sm font-semibold mb-2">
               Most Ordered Items (Paid)
             </h2>
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    nameKey="name"
-                    outerRadius={80}
-                  >
-                    {pieData.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
+
+            <div className={`${cardClass} rounded-2xl p-4`}>
+              <h2 className="text-sm font-semibold mb-2">Most Ordered Items</h2>
+
+              <div className="h-[260px] min-h-[260px] w-full overflow-hidden">
+                {pieData.length > 0 && (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        outerRadius={90}
+                        innerRadius={50}
+                      >
+                        {pieData.map((_, i) => (
+                          <Cell
+                            key={i}
+                            fill={PIE_COLORS[i % PIE_COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+
+            {/* ✅ LEGEND */}
+            <div className="flex flex-wrap gap-2 mt-3 text-xs">
+              {pieData.map((p, i) => (
+                <div key={i} className="flex items-center gap-1">
+                  <span
+                    className="h-3 w-3 rounded-full"
+                    style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
+                  ></span>
+                  <span>{p.name}</span>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -582,6 +765,26 @@ export default function Admin() {
             >
               Close
             </button>
+          </div>
+        )}
+        {showAvatar && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="relative bg-black rounded-2xl p-3 border  shadow-2xl animate-fadeIn">
+              {/* ❌ Close Button */}
+              <button
+                onClick={() => setShowAvatar(false)}
+                className="absolute -top-3 -right-3 bg-orange-500 text-black h-7 w-7 rounded-full font-bold"
+              >
+                ✕
+              </button>
+
+              {/* ✅ Full Image Preview */}
+              <img
+                src="/Screenshot 2025-12-06 160752.png"
+                alt="Preview"
+                className="max-h-[70vh] max-w-[70vw] rounded-xl object-contain"
+              />
+            </div>
           </div>
         )}
       </main>
