@@ -1,16 +1,26 @@
+// server.js
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
+
+const Item = require("./models/Item");
+const Order = require("./models/Order");
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 
+// 🔐 JWT secret (must match everywhere)
+const JWT_SECRET = "SECRETKEY123";
+
 /* ================================
    ✅ MONGODB CONNECTION
 ================================ */
 mongoose
-  .connect("PASTE_YOUR_MONGODB_URL_HERE")
+  .connect(
+    "mongodb+srv://harshjaiswalprgm_db_user:admin123@bachelorshub.cjypsa4.mongodb.net/cafe?retryWrites=true&w=majority"
+  )
   .then(() => console.log("✅ MongoDB Connected"))
   .catch((err) => console.error("❌ MongoDB Error:", err.message));
 
@@ -19,15 +29,48 @@ mongoose
 ================================ */
 const userSchema = new mongoose.Schema({
   username: { type: String, unique: true },
-  password: String,
-  role: String, // admin | kitchen
+  password: String, // plain for now
+  role: String, // "admin" | "kitchen"
 });
 
 const User = mongoose.model("User", userSchema);
 
 /* ================================
+   ✅ JWT MIDDLEWARES
+================================ */
+
+// Basic token check
+function verifyToken(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header) {
+    return res.status(401).json({ success: false, message: "No token provided" });
+  }
+
+  const token = header.split(" ")[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded; // { id, role }
+    next();
+  } catch (err) {
+    return res.status(401).json({ success: false, message: "Invalid token" });
+  }
+}
+
+// Role-based guard (admin / kitchen)
+function requireRole(role) {
+  return (req, res, next) => {
+    if (!req.user || req.user.role !== role) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Access denied: " + role + " only" });
+    }
+    next();
+  };
+}
+
+/* ================================
    ✅ TEMP: CREATE DEFAULT USERS
-   Open once -> http://localhost:5000/create-users
+   Hit once: http://localhost:5000/create-users
 ================================ */
 app.get("/create-users", async (req, res) => {
   await User.deleteMany();
@@ -41,7 +84,7 @@ app.get("/create-users", async (req, res) => {
 });
 
 /* ================================
-   ✅ LOGIN FROM DATABASE
+   ✅ LOGIN (RETURNS JWT)
 ================================ */
 app.post("/login", async (req, res) => {
   const { username, password } = req.body;
@@ -54,179 +97,219 @@ app.post("/login", async (req, res) => {
       .json({ success: false, message: "Invalid credentials" });
   }
 
+  const token = jwt.sign(
+    { id: user._id, role: user.role },
+    JWT_SECRET,
+    { expiresIn: "1d" }
+  );
+
   res.json({
     success: true,
     role: user.role,
+    token,
   });
 });
 
 /* ================================
-   ✅ IN-MEMORY MENU ITEMS (FOR NOW)
+   ✅ MENU APIs (Mongo Items)
 ================================ */
-let items = [
-  {
-    id: 1,
-    name: "Cold Coffee",
-    price: 120,
-    imageUrl: "",
-    category: "Beverage",
-    stock: 20,
-    available: true
-  },
-  {
-    id: 2,
-    name: "Veg Burger",
-    price: 150,
-    imageUrl: "",
-    category: "Snacks",
-    stock: 15,
-    available: true
-  },
-  {
-    id: 3,
-    name: "French Fries",
-    price: 150,
-    imageUrl: "",
-    category: "Snacks",
-    stock: 15,
-    available: true
-  }
-];
 
-
-/* ================================
-   ✅ ORDERS (IN MEMORY FOR NOW)
-================================ */
-let orders = [];
-
-/* ================================
-   ✅ MENU APIs
-================================ */
-app.get("/items", (req, res) => {
+// Public: customer can see menu
+app.get("/items", async (req, res) => {
+  const items = await Item.find().sort({ createdAt: -1 });
   res.json(items);
 });
 
-
-app.post("/update-stock", (req, res) => {
+// Admin: update stock / availability
+app.post("/update-stock", verifyToken, requireRole("admin"), async (req, res) => {
   const { id, stock, available } = req.body;
 
-  const item = items.find((i) => i.id === id);
-  if (!item) {
-    return res.status(404).json({ success: false, message: "Item not found" });
-  }
+  const item = await Item.findByIdAndUpdate(
+    id,
+    { stock, available },
+    { new: true }
+  );
 
-  if (stock !== undefined) item.stock = stock;
-  if (available !== undefined) item.available = available;
+  if (!item) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Item not found" });
+  }
 
   res.json({ success: true, item });
 });
 
-
-app.post("/items", (req, res) => {
+// Admin: add new item
+app.post("/items", verifyToken, requireRole("admin"), async (req, res) => {
   const { name, price, imageUrl, category } = req.body;
-  const newItem = {
-    id: Date.now(),
+
+  const newItem = await Item.create({
     name,
-    price: Number(price) || 0,
-    imageUrl: imageUrl || "",
-    category: category || "General",
-  };
-  items.push(newItem);
+    price,
+    imageUrl,
+    category,
+    stock: 10,
+    available: true,
+  });
+
   res.json({ success: true, item: newItem });
 });
 
-app.put("/items/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const idx = items.findIndex((i) => i.id === id);
-  if (idx === -1)
-    return res.status(404).json({ success: false, message: "Item not found" });
+// Admin: update item details
+app.put("/items/:id", verifyToken, requireRole("admin"), async (req, res) => {
+  const item = await Item.findByIdAndUpdate(
+    req.params.id,
+    req.body,
+    { new: true }
+  );
 
-  items[idx] = { ...items[idx], ...req.body };
-  res.json({ success: true, item: items[idx] });
+  if (!item) {
+    return res
+      .status(404)
+      .json({ success: false, message: "Item not found" });
+  }
+
+  res.json({ success: true, item });
 });
 
-app.delete("/items/:id", (req, res) => {
-  const id = Number(req.params.id);
-  items = items.filter((i) => i.id !== id);
+// Admin: delete item
+app.delete("/items/:id", verifyToken, requireRole("admin"), async (req, res) => {
+  await Item.findByIdAndDelete(req.params.id);
   res.json({ success: true });
 });
 
 /* ================================
-   ✅ PLACE ORDER
+   ✅ PLACE ORDER (Customer)
 ================================ */
-app.post("/order", (req, res) => {
-  const newOrder = {
-    ...req.body,
-    status: "Pending",
-    paymentStatus: "Unpaid",
-    paymentMethod: req.body.paymentMethod || "QR", // ✅ ADD THIS
-    time: new Date().toISOString(),
-    billNo: Date.now(),
-  };
+app.post("/order", async (req, res) => {
+  try {
+    const newOrder = await Order.create({
+      table: req.body.table,
+      cart: req.body.cart,
+      status: "Pending",
+      paymentStatus: req.body.paymentStatus || "Unpaid",
+      paymentMethod: req.body.paymentMethod || "Cash",
+      billNo: Date.now(),
+    });
 
-  orders.push(newOrder);
-  res.json({ success: true });
+    res.json({ success: true, payload: newOrder });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 /* ================================
-   ✅ GET ALL ORDERS
+   ✅ GET ALL ORDERS (Admin / Kitchen)
 ================================ */
-app.get("/orders", (req, res) => {
-  res.json(orders);
+app.post("/admin-update-order", verifyToken, async (req, res) => {
+  const { orderId, updatedOrder } = req.body;
+
+  const order = await Order.findByIdAndUpdate(
+    orderId,
+    updatedOrder,
+    { new: true }
+  );
+
+  res.json({ success: true, order });
 });
 
+
 /* ================================
-   ✅ UPDATE ORDER STATUS
+   ✅ UPDATE ORDER STATUS (Kitchen/Admin)
 ================================ */
-app.post("/update-status", (req, res) => {
-  const { index, status } = req.body;
-  if (orders[index]) orders[index].status = status;
+app.post("/update-status", verifyToken, async (req, res) => {
+  const { orderId, status } = req.body;
+  await Order.findByIdAndUpdate(orderId, { status });
   res.json({ success: true });
 });
 
+
 /* ================================
-   ✅ UPDATE PAYMENT STATUS
+   ✅ UPDATE PAYMENT STATUS (Admin/Kitchen)
 ================================ */
-app.post("/update-payment", (req, res) => {
-  const { index, paymentStatus } = req.body;
-  if (orders[index]) orders[index].paymentStatus = paymentStatus;
+app.post("/update-payment", verifyToken, async (req, res) => {
+  const { orderId } = req.body;
+  await Order.findByIdAndUpdate(orderId, { paymentStatus: "Paid" });
   res.json({ success: true });
 });
+
 
 /* ================================
    ✅ ADMIN FULL ORDER EDIT
+   (You will call this with orderId from frontend)
 ================================ */
-app.post("/admin-update-order", (req, res) => {
-  const { index, updatedOrder } = req.body;
-  if (orders[index]) {
-    orders[index] = { ...orders[index], ...updatedOrder };
+app.post("/admin-update-order", verifyToken, requireRole("admin"), async (req, res) => {
+  const { orderId, updatedOrder } = req.body;
+
+  try {
+    const order = await Order.findByIdAndUpdate(
+      orderId,
+      { $set: updatedOrder },
+      { new: true }
+    );
+
+    if (!order) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
+    }
+
+    res.json({ success: true, order });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
-  res.json({ success: true, order: orders[index] });
 });
 
 /* ================================
    ✅ REPORTS: DAILY / MONTHLY
 ================================ */
-app.get("/reports", (req, res) => {
-  const daily = {};
-  const monthly = {};
+app.get("/reports", verifyToken, async (req, res) => {
+  try {
+    const orders = await Order.find({ paymentStatus: "Paid" });
 
-  orders.forEach((o) => {
-    if (o.paymentStatus !== "Paid") return;
+    const daily = {};
+    const monthly = {};
 
-    const date = new Date(o.time);
-    const dayKey = date.toISOString().slice(0, 10);
-    const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1)
-      .toString()
-      .padStart(2, "0")}`;
+    orders.forEach((o) => {
+      const date = o.createdAt || new Date();
+      const dayKey = date.toISOString().slice(0, 10);
+      const monthKey = `${date.getFullYear()}-${(date.getMonth() + 1)
+        .toString()
+        .padStart(2, "0")}`;
 
-    const amount = o.cart.reduce((sum, item) => sum + item.price, 0);
+      const amount = (o.cart || []).reduce(
+        (sum, item) => sum + (item.price || 0),
+        0
+      );
 
-    daily[dayKey] = (daily[dayKey] || 0) + amount;
-    monthly[monthKey] = (monthly[monthKey] || 0) + amount;
-  });
+      daily[dayKey] = (daily[dayKey] || 0) + amount;
+      monthly[monthKey] = (monthly[monthKey] || 0) + amount;
+    });
 
-  res.json({ daily, monthly });
+    res.json({ daily, monthly });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* ================================
+   ✅ SEED DEFAULT ITEMS (RUN ONCE)
+   http://localhost:5000/seed-items
+================================ */
+app.get("/seed-items", async (req, res) => {
+  try {
+    await Item.deleteMany();
+
+    const data = await Item.create([
+      { name: "Cold Coffee", price: 120, category: "Beverage", stock: 20 },
+      { name: "Veg Burger", price: 150, category: "Snacks", stock: 15 },
+      { name: "French Fries", price: 130, category: "Snacks", stock: 18 },
+    ]);
+
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 /* ================================

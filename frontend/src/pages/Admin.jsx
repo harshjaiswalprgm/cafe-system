@@ -24,8 +24,9 @@ export default function Admin() {
   const [orders, setOrders] = useState([]);
   const [reports, setReports] = useState({ daily: {}, monthly: {} });
   const [chartType, setChartType] = useState("bar"); // bar | line | area
-  const [range, setRange] = useState("daily"); // daily | monthly
+  const [range] = useState("daily"); // daily | monthly
   const [showAvatar, setShowAvatar] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
 
   const [menuItems, setMenuItems] = useState([]);
   const [newItem, setNewItem] = useState({
@@ -34,32 +35,44 @@ export default function Admin() {
     imageUrl: "",
     category: "",
   });
-  const [selectedIndex, setSelectedIndex] = useState(null);
+
   const [editCart, setEditCart] = useState([]);
   const [dark, setDark] = useState(false);
 
   // ---- LOAD DATA ----
   const load = async () => {
     try {
+      const token = localStorage.getItem("token");
+
       const [ordersRes, reportsRes, itemsRes] = await Promise.all([
-        fetch("http://localhost:5000/orders"),
-        fetch("http://localhost:5000/reports"),
-        fetch("http://localhost:5000/items"),
+        fetch("http://localhost:5000/orders", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        fetch("http://localhost:5000/reports", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        fetch("http://localhost:5000/items"), // public, no token needed
       ]);
 
-      if (!ordersRes.ok || !reportsRes.ok || !itemsRes.ok) {
-        throw new Error("Failed to fetch data");
-      }
+      // ✅ Proper error handling
+      if (!ordersRes.ok) throw new Error("Orders API failed");
+      if (!reportsRes.ok) throw new Error("Reports API failed");
+      if (!itemsRes.ok) throw new Error("Items API failed");
 
       const o = await ordersRes.json();
       const r = await reportsRes.json();
       const m = await itemsRes.json();
 
-      setOrders(o);
-      setReports(r);
-      setMenuItems(m);
+      // ✅ SAFETY: always force correct types
+      setOrders(Array.isArray(o) ? o : []);
+      setReports(r || { daily: {}, monthly: {} });
+      setMenuItems(Array.isArray(m) ? m : []);
     } catch (err) {
-      console.error("Load error:", err);
+      console.error("Admin Load Error:", err.message);
     }
   };
 
@@ -111,21 +124,30 @@ export default function Admin() {
   }));
 
   // ---- MENU MANAGEMENT ----
-  const handleAddItem = async (e) => {
-    e.preventDefault();
-    await fetch("http://localhost:5000/items", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newItem),
-    });
-    setNewItem({ name: "", price: "", imageUrl: "", category: "" });
-    load();
-  };
+ const handleAddItem = async (e) => {
+  e.preventDefault();
 
+  await fetch("http://localhost:5000/items", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+    body: JSON.stringify(newItem),
+  });
+
+  setNewItem({ name: "", price: "", imageUrl: "", category: "" });
+  load();
+};
   const handleDeleteItem = async (id) => {
-    await fetch(`http://localhost:5000/items/${id}`, { method: "DELETE" });
-    load();
-  };
+  await fetch(`http://localhost:5000/items/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+  load();
+};
 
   // ---- BILLING RECEIPT (KEEPING AS IS) ----
   const printBill = (o) => {
@@ -196,26 +218,26 @@ export default function Admin() {
     win.print();
   };
 
-  // ---- ORDER EDITING ----
-  const startEditOrder = (index) => {
-    setSelectedIndex(index);
-    setEditCart(orders[index].cart);
-  };
+  // ---- ORDER EDITING deleted because of no use  ----
 
-  const updateOrderField = (field, value) => {
-    if (selectedIndex === null) return;
+  const updateOrderField = (field, value, orderId = selectedOrderId) => {
+    if (!orderId) return;
+
     fetch("http://localhost:5000/admin-update-order", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
       body: JSON.stringify({
-        index: selectedIndex,
+        orderId,
         updatedOrder: { [field]: value },
       }),
     }).then(load);
   };
 
   const addItemToEditCart = (itemId) => {
-    const item = menuItems.find((m) => m.id === Number(itemId));
+    const item = menuItems.find((m) => m._id === itemId);
     if (!item) return;
     setEditCart((prev) => [...prev, item]);
   };
@@ -224,21 +246,26 @@ export default function Admin() {
     setEditCart((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const saveEditedCart = () => {
-    if (selectedIndex === null) return;
-    fetch("http://localhost:5000/admin-update-order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        index: selectedIndex,
-        updatedOrder: { cart: editCart },
-      }),
-    }).then(() => {
-      setSelectedIndex(null);
-      setEditCart([]);
-      load();
-    });
-  };
+ const saveEditedCart = () => {
+  if (!selectedOrderId) return;
+
+  fetch("http://localhost:5000/admin-update-order", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+    body: JSON.stringify({
+      orderId: selectedOrderId,
+      updatedOrder: { cart: editCart },
+    }),
+  }).then(() => {
+    setSelectedOrderId(null);
+    setEditCart([]);
+    load();
+  });
+};
+
 
   // ---- THEME HELPERS ----
   const bgClass = dark
@@ -279,48 +306,47 @@ export default function Admin() {
         </div>
 
         <nav className="space-y-1 text-sm">
-  <p className="text-[11px] uppercase tracking-wide text-gray-400">
-    Menu
-  </p>
+          <p className="text-[11px] uppercase tracking-wide text-gray-400">
+            Menu
+          </p>
 
-  <Link
-    to="/admin"
-    className="block px-3 py-2 rounded-xl bg-orange-500/10 text-orange-400 font-semibold"
-  >
-    Dashboard
-  </Link>
+          <Link
+            to="/admin"
+            className="block px-3 py-2 rounded-xl bg-orange-500/10 text-orange-400 font-semibold"
+          >
+            Dashboard
+          </Link>
 
-  <Link
-    to="/admin"
-    className="block px-3 py-2 rounded-xl hover:bg-slate-800/40"
-  >
-    Orders
-  </Link>
+          <Link
+            to="/admin"
+            className="block px-3 py-2 rounded-xl hover:bg-slate-800/40"
+          >
+            Orders
+          </Link>
 
-  <Link
-    to="/admin"
-    className="block px-3 py-2 rounded-xl hover:bg-slate-800/40"
-  >
-    Menu Items
-  </Link>
+          <Link
+            to="/admin"
+            className="block px-3 py-2 rounded-xl hover:bg-slate-800/40"
+          >
+            Menu Items
+          </Link>
 
-  {/* ✅ NEW STOCK BUTTON */}
-  <Link
-    to="/admin/stock"
-    className="block px-3 py-2 rounded-xl hover:bg-slate-800/40"
-  >
-    📦 Stock Control
-  </Link>
+          {/* ✅ NEW STOCK BUTTON */}
+          <Link
+            to="/admin/stock"
+            className="block px-3 py-2 rounded-xl hover:bg-slate-800/40"
+          >
+            📦 Stock Control
+          </Link>
 
-  {/* ✅ FUTURE REPORTS */}
-  <Link
-    to="/admin/reports"
-    className="block px-3 py-2 rounded-xl hover:bg-slate-800/40"
-  >
-    📊 Reports
-  </Link>
-</nav>
-
+          {/* ✅ FUTURE REPORTS */}
+          <Link
+            to="/admin/reports"
+            className="block px-3 py-2 rounded-xl hover:bg-slate-800/40"
+          >
+            📊 Reports
+          </Link>
+        </nav>
 
         <div className="mt-auto">
           <button
@@ -372,399 +398,427 @@ export default function Admin() {
         </section>
 
         {/* CHARTS */}
-        <section className="grid lg:grid-cols-2 gap-4 mb-6">
-          {/* ✅ REVENUE CHART WITH CONTROLS */}
-          <div className={`${cardClass} rounded-2xl p-4 relative`}>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold">
-                {range === "daily" ? "Daily Revenue" : "Monthly Revenue"}
-              </h2>
+       <section className="grid lg:grid-cols-2 gap-4 mb-6">
+  {/* ✅ REVENUE CHART */}
+  <div className={`${cardClass} rounded-2xl p-4 relative`}>
+    <div className="flex items-center justify-between mb-2">
+      <h2 className="text-sm font-semibold">
+        {range === "daily" ? "Daily Revenue" : "Monthly Revenue"}
+      </h2>
 
-              <div className="flex gap-2 text-xs">
-                <select
-                  value={range}
-                  onChange={(e) => setRange(e.target.value)}
-                  className="px-2 py-1 rounded bg-orange-500 text-black font-semibold"
+      {/* ✅ ONLY CHART TYPE CONTROL */}
+      <select
+        value={chartType}
+        onChange={(e) => setChartType(e.target.value)}
+        className="px-2 py-1 text-xs rounded bg-black text-white border border-orange-400"
+      >
+        <option value="bar">Bar</option>
+        <option value="line">Line</option>
+        <option value="area">Area</option>
+      </select>
+    </div>
+
+    {/* ✅ SAFE HEIGHT */}
+    <div style={{ width: "100%", height: 260 }}>
+      {activeChartData.length > 0 ? (
+        <ResponsiveContainer width="100%" height="100%">
+          {chartType === "bar" && (
+            <BarChart data={activeChartData}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+              <XAxis dataKey={range === "daily" ? "date" : "month"} />
+              <YAxis />
+              <Tooltip />
+              <Bar
+                dataKey="total"
+                fill="#f97316"
+                radius={[6, 6, 0, 0]}
+              />
+            </BarChart>
+          )}
+
+          {chartType === "line" && (
+            <LineChart data={activeChartData}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+              <XAxis dataKey={range === "daily" ? "date" : "month"} />
+              <YAxis />
+              <Tooltip />
+              <Line
+                type="monotone"
+                dataKey="total"
+                stroke="#f97316"
+                strokeWidth={3}
+              />
+            </LineChart>
+          )}
+
+          {chartType === "area" && (
+            <AreaChart data={activeChartData}>
+              <defs>
+                <linearGradient
+                  id="colorRevenue"
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
                 >
-                  <option value="daily">Daily</option>
-                  <option value="monthly">Monthly</option>
-                </select>
+                  <stop offset="5%" stopColor="#f97316" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+              <XAxis dataKey={range === "daily" ? "date" : "month"} />
+              <YAxis />
+              <Tooltip />
+              <Area
+                type="monotone"
+                dataKey="total"
+                stroke="#f97316"
+                fill="url(#colorRevenue)"
+              />
+            </AreaChart>
+          )}
+        </ResponsiveContainer>
+      ) : (
+        <div className="h-full flex items-center justify-center text-xs text-slate-400">
+          No revenue data yet
+        </div>
+      )}
+    </div>
+  </div>
 
-                <select
-                  value={chartType}
-                  onChange={(e) => setChartType(e.target.value)}
-                  className="px-2 py-1 rounded bg-black text-white border border-orange-400"
-                >
-                  <option value="bar">Bar</option>
-                  <option value="line">Line</option>
-                  <option value="area">Area</option>
-                </select>
-              </div>
-            </div>
+  {/* ✅ MOST ORDERED ITEMS PIE */}
+  <div className={`${cardClass} rounded-2xl p-4`}>
+    <h2 className="text-sm font-semibold mb-2">
+      Most Ordered Items (Paid)
+    </h2>
 
-            {/* ✅ SAFE HEIGHT + SAFE DATA CHECK */}
-            <div style={{ width: "100%", height: 260 }}>
-              {activeChartData.length > 0 && (
-                <ResponsiveContainer width="100%" height="100%">
-                  {chartType === "bar" && (
-                    <BarChart data={activeChartData}>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                      <XAxis dataKey={range === "daily" ? "date" : "month"} />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar
-                        dataKey="total"
-                        fill="#f97316"
-                        radius={[6, 6, 0, 0]}
-                      />
-                    </BarChart>
-                  )}
-
-                  {chartType === "line" && (
-                    <LineChart data={activeChartData}>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                      <XAxis dataKey={range === "daily" ? "date" : "month"} />
-                      <YAxis />
-                      <Tooltip />
-                      <Line
-                        type="monotone"
-                        dataKey="total"
-                        stroke="#f97316"
-                        strokeWidth={3}
-                      />
-                    </LineChart>
-                  )}
-
-                  {chartType === "area" && (
-                    <AreaChart data={activeChartData}>
-                      <defs>
-                        <linearGradient
-                          id="colorRevenue"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="5%"
-                            stopColor="#f97316"
-                            stopOpacity={0.8}
-                          />
-                          <stop
-                            offset="95%"
-                            stopColor="#f97316"
-                            stopOpacity={0}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-                      <XAxis dataKey={range === "daily" ? "date" : "month"} />
-                      <YAxis />
-                      <Tooltip />
-                      <Area
-                        type="monotone"
-                        dataKey="total"
-                        stroke="#f97316"
-                        fill="url(#colorRevenue)"
-                      />
-                    </AreaChart>
-                  )}
-                </ResponsiveContainer>
-              )}
-
-              {/* ✅ EMPTY STATE (VERY IMPORTANT) */}
-              {activeChartData.length === 0 && (
-                <div className="h-full flex items-center justify-center text-xs text-slate-400">
-                  No revenue data yet
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ✅ MOST ORDERED ITEMS PIE (ADVANCED LOOK) */}
-          <div className={`${cardClass} rounded-2xl p-4`}>
-            <h2 className="text-sm font-semibold mb-2">
-              Most Ordered Items (Paid)
-            </h2>
-
-            <div className={`${cardClass} rounded-2xl p-4`}>
-              <h2 className="text-sm font-semibold mb-2">Most Ordered Items</h2>
-
-              <div className="h-[260px] min-h-[260px] w-full overflow-hidden">
-                {pieData.length > 0 && (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        dataKey="value"
-                        nameKey="name"
-                        outerRadius={90}
-                        innerRadius={50}
-                      >
-                        {pieData.map((_, i) => (
-                          <Cell
-                            key={i}
-                            fill={PIE_COLORS[i % PIE_COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </div>
-
-            {/* ✅ LEGEND */}
-            <div className="flex flex-wrap gap-2 mt-3 text-xs">
-              {pieData.map((p, i) => (
-                <div key={i} className="flex items-center gap-1">
-                  <span
-                    className="h-3 w-3 rounded-full"
-                    style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
-                  ></span>
-                  <span>{p.name}</span>
-                </div>
+    <div className="h-[260px] w-full">
+      {pieData.length > 0 ? (
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={pieData}
+              dataKey="value"
+              nameKey="name"
+              outerRadius={90}
+              innerRadius={50}
+            >
+              {pieData.map((_, i) => (
+                <Cell
+                  key={i}
+                  fill={PIE_COLORS[i % PIE_COLORS.length]}
+                />
               ))}
-            </div>
-          </div>
-        </section>
+            </Pie>
+            <Tooltip />
+          </PieChart>
+        </ResponsiveContainer>
+      ) : (
+        <div className="h-full flex items-center justify-center text-xs text-slate-400">
+          No item data yet
+        </div>
+      )}
+    </div>
+
+    {/* ✅ LEGEND */}
+    <div className="flex flex-wrap gap-2 mt-3 text-xs">
+      {pieData.map((p, i) => (
+        <div key={p.name} className="flex items-center gap-1">
+          <span
+            className="h-3 w-3 rounded-full"
+            style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
+          />
+          <span>{p.name}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
 
         {/* MENU + ADD ITEM */}
-        <section className="grid md:grid-cols-2 gap-4 mb-6">
-          <div className={`${cardClass} rounded-2xl p-4`}>
-            <h2 className="text-sm font-semibold mb-2">Menu Items</h2>
-            <div className="space-y-2 max-h-64 overflow-y-auto text-sm">
-              {menuItems.map((m) => (
-                <div
-                  key={m.id}
-                  className={`flex justify-between items-center px-3 py-2 rounded-xl ${
-                    dark ? "bg-slate-800" : "bg-slate-50"
-                  }`}
-                >
-                  <div>
-                    <p className="font-semibold">{m.name}</p>
-                    <p className={`text-[11px] ${mutedText}`}>
-                      ₹{m.price} • {m.category}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteItem(m.id)}
-                    className="text-xs px-3 py-1 rounded-full bg-red-500 text-white"
-                  >
-                    Delete
-                  </button>
-                </div>
-              ))}
-            </div>
+       <section className="grid md:grid-cols-2 gap-4 mb-6">
+  {/* ================= MENU ITEMS LIST ================= */}
+  <div className={`${cardClass} rounded-2xl p-4`}>
+    <h2 className="text-sm font-semibold mb-2">Menu Items</h2>
+
+    <div className="space-y-2 max-h-64 overflow-y-auto text-sm">
+      {menuItems.map((m) => (
+        <div
+          key={m._id}
+          className={`flex justify-between items-center px-3 py-2 rounded-xl ${
+            dark ? "bg-slate-800" : "bg-slate-50"
+          }`}
+        >
+          <div>
+            <p className="font-semibold">{m.name}</p>
+            <p className={`text-[11px] ${mutedText}`}>
+              ₹{m.price} • {m.category}
+            </p>
           </div>
 
-          <div className={`${cardClass} rounded-2xl p-4`}>
-            <h2 className="text-sm font-semibold mb-2">Add New Item</h2>
-            <form onSubmit={handleAddItem} className="space-y-2 text-sm">
-              <input
-                className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
-                placeholder="Item name"
-                value={newItem.name}
-                onChange={(e) =>
-                  setNewItem((n) => ({ ...n, name: e.target.value }))
-                }
-              />
-              <input
-                className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
-                placeholder="Price"
-                type="number"
-                value={newItem.price}
-                onChange={(e) =>
-                  setNewItem((n) => ({ ...n, price: e.target.value }))
-                }
-              />
-              <input
-                className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
-                placeholder="Image URL (optional)"
-                value={newItem.imageUrl}
-                onChange={(e) =>
-                  setNewItem((n) => ({ ...n, imageUrl: e.target.value }))
-                }
-              />
-              <input
-                className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
-                placeholder="Category (e.g. Pizza, Drinks)"
-                value={newItem.category}
-                onChange={(e) =>
-                  setNewItem((n) => ({ ...n, category: e.target.value }))
-                }
-              />
-              <button
-                type="submit"
-                className="mt-1 bg-orange-500 text-black px-4 py-2 rounded-lg font-semibold"
-              >
-                Save Item
-              </button>
-            </form>
-          </div>
-        </section>
+          {/* ✅ FIXED: Mongo _id + JWT */}
+          <button
+            onClick={() => handleDeleteItem(m._id)}
+            className="text-xs px-3 py-1 rounded-full bg-red-500 text-white"
+          >
+            Delete
+          </button>
+        </div>
+      ))}
+    </div>
+  </div>
+
+  {/* ================= ADD NEW ITEM ================= */}
+  <div className={`${cardClass} rounded-2xl p-4`}>
+    <h2 className="text-sm font-semibold mb-2">Add New Item</h2>
+
+    <form onSubmit={handleAddItem} className="space-y-2 text-sm">
+      <input
+        className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
+        placeholder="Item name"
+        value={newItem.name}
+        onChange={(e) =>
+          setNewItem((n) => ({ ...n, name: e.target.value }))
+        }
+        required
+      />
+
+      <input
+        className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
+        placeholder="Price"
+        type="number"
+        value={newItem.price}
+        onChange={(e) =>
+          setNewItem((n) => ({ ...n, price: e.target.value }))
+        }
+        required
+      />
+
+      <input
+        className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
+        placeholder="Image URL (optional)"
+        value={newItem.imageUrl}
+        onChange={(e) =>
+          setNewItem((n) => ({ ...n, imageUrl: e.target.value }))
+        }
+      />
+
+      <input
+        className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
+        placeholder="Category (e.g. Pizza, Drinks)"
+        value={newItem.category}
+        onChange={(e) =>
+          setNewItem((n) => ({ ...n, category: e.target.value }))
+        }
+        required
+      />
+
+      <button
+        type="submit"
+        className="mt-1 bg-orange-500 text-black px-4 py-2 rounded-lg font-semibold"
+      >
+        Save Item
+      </button>
+    </form>
+  </div>
+</section>
+
 
         {/* ORDERS */}
         <section className="mb-16">
-          <h2 className="text-sm font-semibold mb-2">All Orders</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {orders.map((o, i) => {
-              const amount = o.cart.reduce((s, item) => s + item.price, 0);
-              const isSelected = selectedIndex === i;
-              return (
-                <div
-                  key={i}
-                  className={`${cardClass} rounded-2xl p-4 ${
-                    isSelected ? "ring-2 ring-orange-400" : ""
-                  }`}
-                >
-                  <div className="flex justify-between items-center mb-1">
-                    <p className="font-semibold text-sm">
-                      Table {o.table}
-                      <span className={`block text-[11px] ${mutedText}`}>
-                        Bill #{o.billNo}
-                      </span>
-                    </p>
-                    <button
-                      onClick={() => printBill(o)}
-                      className="text-[11px] px-2 py-1 rounded-full border border-slate-500"
-                    >
-                      🧾 Print
-                    </button>
-                  </div>
+  <h2 className="text-sm font-semibold mb-2">All Orders</h2>
 
-                  <p className="text-xs">
-                    Status:{" "}
-                    <span className="font-semibold text-orange-300">
-                      {o.status}
-                    </span>
-                  </p>
-                  <p className="text-xs">
-                    Payment:{" "}
-                    <span
-                      className={
-                        o.paymentStatus === "Paid"
-                          ? "text-emerald-400 font-semibold"
-                          : "text-yellow-300 font-semibold"
-                      }
-                    >
-                      {o.paymentStatus}
-                    </span>
-                  </p>
-                  <p className="text-xs mt-1">
-                    Total:{" "}
-                    <span className="font-semibold text-orange-400">
-                      ₹{amount}
-                    </span>
-                  </p>
+  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {orders.map((o) => {
+      const amount = o.cart.reduce((s, item) => s + item.price, 0);
+      const isSelected = selectedOrderId === o._id; // ✅ FIXED
 
-                  <div
-                    className={`text-[11px] mt-2 max-h-16 overflow-y-auto ${mutedText}`}
-                  >
-                    {o.cart.map((c, j) => (
-                      <p key={j}>• {c.name}</p>
-                    ))}
-                  </div>
+      return (
+        <div
+          key={o._id}
+          className={`${cardClass} rounded-2xl p-4 ${
+            isSelected ? "ring-2 ring-orange-400" : ""
+          }`}
+        >
+          {/* HEADER */}
+          <div className="flex justify-between items-center mb-1">
+            <p className="font-semibold text-sm">
+              Table {o.table}
+              <span className={`block text-[11px] ${mutedText}`}>
+                Bill #{o.billNo}
+              </span>
+            </p>
 
-                  <div className="flex gap-2 mt-3 text-[11px]">
-                    <button
-                      onClick={() => startEditOrder(i)}
-                      className="flex-1 px-2 py-1 rounded-full bg-orange-500 text-black font-semibold"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => updateOrderField("status", "Cancelled")}
-                      className="flex-1 px-2 py-1 rounded-full bg-red-500/80 text-white"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            <button
+              onClick={() => printBill(o)}
+              className="text-[11px] px-2 py-1 rounded-full border border-slate-500"
+            >
+              🧾 Print
+            </button>
           </div>
-        </section>
 
+          {/* STATUS */}
+          <p className="text-xs">
+            Status:{" "}
+            <span className="font-semibold text-orange-300">
+              {o.status}
+            </span>
+          </p>
+
+          <p className="text-xs">
+            Payment:{" "}
+            <span
+              className={
+                o.paymentStatus === "Paid"
+                  ? "text-emerald-400 font-semibold"
+                  : "text-yellow-300 font-semibold"
+              }
+            >
+              {o.paymentStatus}
+            </span>
+          </p>
+
+          <p className="text-xs mt-1">
+            Total:{" "}
+            <span className="font-semibold text-orange-400">
+              ₹{amount}
+            </span>
+          </p>
+
+          {/* ITEMS */}
+          <div
+            className={`text-[11px] mt-2 max-h-16 overflow-y-auto ${mutedText}`}
+          >
+            {o.cart.map((c, j) => (
+              <p key={j}>• {c.name}</p>
+            ))}
+          </div>
+
+          {/* ACTIONS */}
+          <div className="flex gap-2 mt-3 text-[11px]">
+            <button
+              onClick={() => {
+                setSelectedOrderId(o._id);   // ✅ Mongo ID
+                setEditCart(o.cart || []);
+              }}
+              className="flex-1 px-2 py-1 rounded-full bg-orange-500 text-black font-semibold"
+            >
+              Edit
+            </button>
+
+            <button
+              onClick={() =>
+                updateOrderField("status", "Cancelled", o._id)
+              }
+              className="flex-1 px-2 py-1 rounded-full bg-red-500/80 text-white"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</section>
         {/* BOTTOM EDIT BAR */}
-        {selectedIndex !== null && orders[selectedIndex] && (
+        {selectedOrderId && (
           <div
             className={`fixed bottom-0 left-0 right-0 ${
               dark ? "bg-slate-900" : "bg-white"
-            } border-t border-slate-700 px-4 py-3 flex flex-wrap items-center gap-3 text-xs`}
+            } border-t border-slate-700 px-4 py-3 flex flex-wrap items-center gap-3 text-xs z-50`}
           >
-            <span className="font-semibold">
-              Editing Bill #{orders[selectedIndex].billNo}
-            </span>
+            {(() => {
+              const order = orders.find((o) => o._id === selectedOrderId);
+              if (!order) return null;
 
-            <select
-              defaultValue={orders[selectedIndex].status}
-              onChange={(e) => updateOrderField("status", e.target.value)}
-              className="border border-slate-500 rounded px-2 py-1 bg-transparent"
-            >
-              <option>Pending</option>
-              <option>Preparing</option>
-              <option>Ready</option>
-              <option>Served</option>
-              <option>Cancelled</option>
-            </select>
+              return (
+                <>
+                  <span className="font-semibold">
+                    Editing Bill #{order.billNo}
+                  </span>
 
-            <select
-              defaultValue={orders[selectedIndex].paymentStatus}
-              onChange={(e) =>
-                updateOrderField("paymentStatus", e.target.value)
-              }
-              className="border border-slate-500 rounded px-2 py-1 bg-transparent"
-            >
-              <option>Unpaid</option>
-              <option>Paid</option>
-            </select>
+                  {/* STATUS */}
+                  <select
+                    value={order.status}
+                    onChange={(e) =>
+                      updateOrderField("status", e.target.value, order._id)
+                    }
+                    className="border border-slate-500 rounded px-2 py-1 bg-transparent"
+                  >
+                    <option>Pending</option>
+                    <option>Preparing</option>
+                    <option>Ready</option>
+                    <option>Served</option>
+                    <option>Cancelled</option>
+                  </select>
 
-            <select
-              onChange={(e) => {
-                addItemToEditCart(e.target.value);
-                e.target.value = "";
-              }}
-              className="border border-slate-500 rounded px-2 py-1 bg-transparent"
-              defaultValue=""
-            >
-              <option value="">Add Item…</option>
-              {menuItems.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
+                  {/* PAYMENT */}
+                  <select
+                    value={order.paymentStatus}
+                    onChange={(e) =>
+                      updateOrderField(
+                        "paymentStatus",
+                        e.target.value,
+                        order._id
+                      )
+                    }
+                    className="border border-slate-500 rounded px-2 py-1 bg-transparent"
+                  >
+                    <option>Unpaid</option>
+                    <option>Paid</option>
+                  </select>
 
-            <div className="flex gap-1 max-w-xs overflow-x-auto">
-              {editCart.map((i, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => removeItemFromEditCart(idx)}
-                  className="px-2 py-1 rounded-full bg-slate-700 text-xs"
-                >
-                  {i.name} ✕
-                </button>
-              ))}
-            </div>
+                  {/* ADD ITEM */}
+                  <select
+                    onChange={(e) => {
+                      addItemToEditCart(e.target.value);
+                      e.target.value = "";
+                    }}
+                    className="border border-slate-500 rounded px-2 py-1 bg-transparent"
+                    defaultValue=""
+                  >
+                    <option value="">Add Item…</option>
+                    {menuItems.map((m) => (
+                      <option key={m._id} value={m._id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
 
-            <button
-              onClick={saveEditedCart}
-              className="px-3 py-1 rounded-full bg-emerald-500 text-black font-semibold"
-            >
-              Save Items
-            </button>
+                  {/* EDIT CART */}
+                  <div className="flex gap-1 max-w-xs overflow-x-auto">
+                    {editCart.map((i, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => removeItemFromEditCart(idx)}
+                        className="px-2 py-1 rounded-full bg-slate-700 text-xs"
+                      >
+                        {i.name} ✕
+                      </button>
+                    ))}
+                  </div>
 
-            <button
-              onClick={() => {
-                setSelectedIndex(null);
-                setEditCart([]);
-              }}
-              className="px-3 py-1 rounded-full bg-slate-600 text-slate-50"
-            >
-              Close
-            </button>
+                  {/* SAVE */}
+                  <button
+                    onClick={saveEditedCart}
+                    className="px-3 py-1 rounded-full bg-emerald-500 text-black font-semibold"
+                  >
+                    Save Items
+                  </button>
+
+                  {/* CLOSE */}
+                  <button
+                    onClick={() => {
+                      setSelectedOrderId(null);
+                      setEditCart([]);
+                    }}
+                    className="px-3 py-1 rounded-full bg-slate-600 text-slate-50"
+                  >
+                    Close
+                  </button>
+                </>
+              );
+            })()}
           </div>
         )}
         {showAvatar && (

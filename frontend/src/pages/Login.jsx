@@ -26,7 +26,9 @@ export default function Login() {
         return;
       }
 
+      localStorage.setItem("token", data.token);
       localStorage.setItem("role", data.role);
+
       if (data.role === "admin") navigate("/admin");
       else if (data.role === "kitchen") navigate("/kitchen");
       else navigate(from);
@@ -37,7 +39,6 @@ export default function Login() {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center overflow-hidden">
-
       {/* ✅ PARALLAX ZOOM BACKGROUND */}
       <div
         className="absolute inset-0 bg-cover bg-center animate-parallax"
@@ -52,7 +53,6 @@ export default function Login() {
 
       {/* ✅ Glass Main Card */}
       <div className="relative z-10 w-[95%] max-w-4xl h-[520px] rounded-[28px] bg-white/20 backdrop-blur-2xl shadow-2xl flex overflow-hidden border border-white/30">
-
         {/* ✅ LEFT BRAND PANEL */}
         <div className="hidden md:flex w-1/2 flex-col items-center justify-center bg-black/30">
           <h1 className="text-4xl font-extrabold text-orange-400 tracking-wide mb-3">
@@ -73,7 +73,6 @@ export default function Login() {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-
             {/* ✅ ROLE */}
             <div>
               <label className="text-xs font-semibold text-neutral-700">
@@ -121,8 +120,12 @@ export default function Login() {
 
           {/* ✅ TEST CREDENTIALS */}
           <div className="mt-6 text-[11px] text-neutral-600 space-y-1">
-            <p>Admin: <b>admin / admin123</b></p>
-            <p>Kitchen: <b>kitchen / kitchen123</b></p>
+            <p>
+              Admin: <b>admin / admin123</b>
+            </p>
+            <p>
+              Kitchen: <b>kitchen / kitchen123</b>
+            </p>
           </div>
         </div>
       </div>
@@ -139,7 +142,6 @@ export default function Login() {
           animation: parallax 25s ease-in-out infinite;
         }
       `}</style>
-
     </div>
   );
 }

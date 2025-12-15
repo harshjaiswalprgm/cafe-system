@@ -21,28 +21,40 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
 
   // 🔄 LOAD DATA (ORDERS + REPORTS)
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [ordersRes, reportsRes] = await Promise.all([
-          fetch("http://localhost:5000/orders"),
-          fetch("http://localhost:5000/reports"),
-        ]);
+ useEffect(() => {
+  const fetchData = async () => {
+    try {
+      const token = localStorage.getItem("token");
 
-        const o = await ordersRes.json();
-        const r = await reportsRes.json();
+      const [ordersRes, reportsRes] = await Promise.all([
+        fetch("http://localhost:5000/orders", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        fetch("http://localhost:5000/reports", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+      ]);
 
-        setOrders(o || []);
-        setReports(r || { daily: {}, monthly: {} });
-      } catch (err) {
-        console.error("Reports fetch error:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      const o = await ordersRes.json();
+      const r = await reportsRes.json();
 
-    fetchData();
-  }, []);
+      // ✅ Safety Guards
+      setOrders(Array.isArray(o) ? o : []);
+      setReports(r || { daily: {}, monthly: {} });
+    } catch (err) {
+      console.error("Reports fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchData();
+}, []);
+
 
   // 📊 DERIVED METRICS
   const paidOrders = orders.filter((o) => o.paymentStatus === "Paid");

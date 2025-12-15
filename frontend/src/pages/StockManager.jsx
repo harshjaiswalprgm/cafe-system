@@ -4,9 +4,14 @@ export default function StockManager() {
   const [items, setItems] = useState([]);
 
   const loadItems = async () => {
-    const res = await fetch("http://localhost:5000/items");
+    const res = await fetch("http://localhost:5000/items", {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`, // ✅ JWT
+      },
+    });
+
     const data = await res.json();
-    setItems(data);
+    setItems(data || []);
   };
 
   useEffect(() => {
@@ -16,18 +21,26 @@ export default function StockManager() {
   const updateStock = async (id, stock) => {
     await fetch("http://localhost:5000/update-stock", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`, // ✅ REQUIRED
+      },
       body: JSON.stringify({ id, stock }),
     });
+
     loadItems();
   };
 
   const toggleAvailability = async (id, available) => {
     await fetch("http://localhost:5000/update-stock", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`, // ✅ REQUIRED
+      },
       body: JSON.stringify({ id, available }),
     });
+
     loadItems();
   };
 
@@ -38,7 +51,7 @@ export default function StockManager() {
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {items.map((item) => (
           <div
-            key={item.id}
+            key={item._id} // ✅ FIXED
             className="bg-neutral-900 border border-orange-500/30 rounded-xl p-4"
           >
             <h2 className="text-lg font-semibold">{item.name}</h2>
@@ -52,7 +65,7 @@ export default function StockManager() {
                 type="number"
                 value={item.stock}
                 onChange={(e) =>
-                  updateStock(item.id, Number(e.target.value))
+                  updateStock(item._id, Number(e.target.value)) // ✅ FIXED
                 }
                 className="w-20 bg-black border border-neutral-700 rounded px-2 py-1 text-sm"
               />
@@ -60,7 +73,7 @@ export default function StockManager() {
 
             <button
               onClick={() =>
-                toggleAvailability(item.id, !item.available)
+                toggleAvailability(item._id, !item.available) // ✅ FIXED
               }
               className={`mt-3 w-full text-sm py-2 rounded-lg ${
                 item.available
