@@ -124,30 +124,30 @@ export default function Admin() {
   }));
 
   // ---- MENU MANAGEMENT ----
- const handleAddItem = async (e) => {
-  e.preventDefault();
+  const handleAddItem = async (e) => {
+    e.preventDefault();
 
-  await fetch("http://localhost:5000/items", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
-    body: JSON.stringify(newItem),
-  });
+    await fetch("http://localhost:5000/items", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify(newItem),
+    });
 
-  setNewItem({ name: "", price: "", imageUrl: "", category: "" });
-  load();
-};
+    setNewItem({ name: "", price: "", imageUrl: "", category: "" });
+    load();
+  };
   const handleDeleteItem = async (id) => {
-  await fetch(`http://localhost:5000/items/${id}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
-  });
-  load();
-};
+    await fetch(`http://localhost:5000/items/${id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+    load();
+  };
 
   // ---- BILLING RECEIPT (KEEPING AS IS) ----
   const printBill = (o) => {
@@ -246,26 +246,25 @@ export default function Admin() {
     setEditCart((prev) => prev.filter((_, i) => i !== idx));
   };
 
- const saveEditedCart = () => {
-  if (!selectedOrderId) return;
+  const saveEditedCart = () => {
+    if (!selectedOrderId) return;
 
-  fetch("http://localhost:5000/admin-update-order", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
-    body: JSON.stringify({
-      orderId: selectedOrderId,
-      updatedOrder: { cart: editCart },
-    }),
-  }).then(() => {
-    setSelectedOrderId(null);
-    setEditCart([]);
-    load();
-  });
-};
-
+    fetch("http://localhost:5000/admin-update-order", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({
+        orderId: selectedOrderId,
+        updatedOrder: { cart: editCart },
+      }),
+    }).then(() => {
+      setSelectedOrderId(null);
+      setEditCart([]);
+      load();
+    });
+  };
 
   // ---- THEME HELPERS ----
   const bgClass = dark
@@ -398,19 +397,25 @@ export default function Admin() {
         </section>
 
         {/* CHARTS */}
-       <section className="grid lg:grid-cols-2 gap-4 mb-6">
-  {/* ✅ REVENUE CHART */}
-  <div className={`${cardClass} rounded-2xl p-4 relative`}>
-    <div className="flex items-center justify-between mb-2">
-      <h2 className="text-sm font-semibold">
-        {range === "daily" ? "Daily Revenue" : "Monthly Revenue"}
-      </h2>
+      <section className="grid lg:grid-cols-2 gap-4 mb-6">
+  {/* ================= REVENUE CHART ================= */}
+  <div className={`${cardClass} rounded-2xl p-5 relative`}>
+    {/* HEADER */}
+    <div className="flex items-center justify-between mb-4">
+      <div>
+        <p className="text-[11px] uppercase tracking-wide text-slate-400">
+          Revenue Analytics
+        </p>
+        <h2 className="text-sm font-semibold">
+          {range === "daily" ? "Daily Revenue" : "Monthly Revenue"}
+        </h2>
+      </div>
 
-      {/* ✅ ONLY CHART TYPE CONTROL */}
+      {/* CHART TYPE */}
       <select
         value={chartType}
         onChange={(e) => setChartType(e.target.value)}
-        className="px-2 py-1 text-xs rounded bg-black text-white border border-orange-400"
+        className="px-3 py-1.5 text-xs rounded-lg bg-transparent border border-slate-400/40 focus:outline-none focus:ring-1 focus:ring-green-400"
       >
         <option value="bar">Bar</option>
         <option value="line">Line</option>
@@ -418,8 +423,8 @@ export default function Admin() {
       </select>
     </div>
 
-    {/* ✅ SAFE HEIGHT */}
-    <div style={{ width: "100%", height: 260 }}>
+    {/* CHART */}
+    <div className="h-[260px] w-full">
       {activeChartData.length > 0 ? (
         <ResponsiveContainer width="100%" height="100%">
           {chartType === "bar" && (
@@ -480,18 +485,25 @@ export default function Admin() {
         </ResponsiveContainer>
       ) : (
         <div className="h-full flex items-center justify-center text-xs text-slate-400">
-          No revenue data yet
+          No revenue data available
         </div>
       )}
     </div>
   </div>
 
-  {/* ✅ MOST ORDERED ITEMS PIE */}
-  <div className={`${cardClass} rounded-2xl p-4`}>
-    <h2 className="text-sm font-semibold mb-2">
-      Most Ordered Items (Paid)
-    </h2>
+  {/* ================= MOST ORDERED ITEMS ================= */}
+  <div className={`${cardClass} rounded-2xl p-5`}>
+    {/* HEADER */}
+    <div className="mb-4">
+      <p className="text-[11px] uppercase tracking-wide text-slate-400">
+        Insights
+      </p>
+      <h2 className="text-sm font-semibold">
+        Most Ordered Items (Paid)
+      </h2>
+    </div>
 
+    {/* PIE */}
     <div className="h-[260px] w-full">
       {pieData.length > 0 ? (
         <ResponsiveContainer width="100%" height="100%">
@@ -515,179 +527,264 @@ export default function Admin() {
         </ResponsiveContainer>
       ) : (
         <div className="h-full flex items-center justify-center text-xs text-slate-400">
-          No item data yet
+          No item data available
         </div>
       )}
     </div>
 
-    {/* ✅ LEGEND */}
-    <div className="flex flex-wrap gap-2 mt-3 text-xs">
+    {/* LEGEND */}
+    <div className="flex flex-wrap gap-3 mt-4 text-xs">
       {pieData.map((p, i) => (
-        <div key={p.name} className="flex items-center gap-1">
+        <div key={p.name} className="flex items-center gap-2">
           <span
             className="h-3 w-3 rounded-full"
             style={{ background: PIE_COLORS[i % PIE_COLORS.length] }}
           />
-          <span>{p.name}</span>
+          <span className="truncate max-w-[120px]">
+            {p.name}
+          </span>
         </div>
       ))}
     </div>
   </div>
 </section>
 
+
         {/* MENU + ADD ITEM */}
-       <section className="grid md:grid-cols-2 gap-4 mb-6">
-  {/* ================= MENU ITEMS LIST ================= */}
-  <div className={`${cardClass} rounded-2xl p-4`}>
-    <h2 className="text-sm font-semibold mb-2">Menu Items</h2>
-
-    <div className="space-y-2 max-h-64 overflow-y-auto text-sm">
-      {menuItems.map((m) => (
-        <div
-          key={m._id}
-          className={`flex justify-between items-center px-3 py-2 rounded-xl ${
-            dark ? "bg-slate-800" : "bg-slate-50"
-          }`}
-        >
-          <div>
-            <p className="font-semibold">{m.name}</p>
-            <p className={`text-[11px] ${mutedText}`}>
-              ₹{m.price} • {m.category}
-            </p>
-          </div>
-
-          {/* ✅ FIXED: Mongo _id + JWT */}
-          <button
-            onClick={() => handleDeleteItem(m._id)}
-            className="text-xs px-3 py-1 rounded-full bg-red-500 text-white"
-          >
-            Delete
-          </button>
-        </div>
-      ))}
+        <section className="grid md:grid-cols-2 gap-4 mb-6">
+          {/* ================= MENU ITEMS LIST ================= */}
+          <div className={`${cardClass} rounded-2xl p-5`}>
+  {/* HEADER */}
+  <div className="flex items-center justify-between mb-3">
+    <div>
+      <p className="text-[11px] uppercase tracking-wide text-slate-400">
+        Inventory
+      </p>
+      <h2 className="text-sm font-semibold">
+        Menu Items
+      </h2>
     </div>
+
+    <span className={`text-xs ${mutedText}`}>
+      {menuItems.length} items
+    </span>
   </div>
 
-  {/* ================= ADD NEW ITEM ================= */}
-  <div className={`${cardClass} rounded-2xl p-4`}>
-    <h2 className="text-sm font-semibold mb-2">Add New Item</h2>
+  {/* LIST */}
+  <div className="space-y-2 max-h-64 overflow-y-auto text-sm pr-1">
+    {menuItems.map((m) => (
+      <div
+        key={m._id}
+        className={`flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl transition ${
+          dark
+            ? "bg-slate-800 hover:bg-slate-700"
+            : "bg-slate-50 hover:bg-slate-100"
+        }`}
+      >
+        {/* ITEM INFO */}
+        <div className="min-w-0">
+          <p className="font-semibold truncate">
+            {m.name}
+          </p>
+          <p className={`text-[11px] ${mutedText}`}>
+            ₹{m.price} • {m.category}
+          </p>
+        </div>
 
-    <form onSubmit={handleAddItem} className="space-y-2 text-sm">
+        {/* ACTION */}
+        <button
+          onClick={() => handleDeleteItem(m._id)}
+          className="shrink-0 text-[11px] px-3 py-1.5 rounded-full border border-red-500/40 text-red-400 hover:bg-red-500 hover:text-white transition"
+          title="Delete item"
+        >
+          Delete
+        </button>
+      </div>
+    ))}
+
+    {/* EMPTY STATE */}
+    {menuItems.length === 0 && (
+      <div className="py-10 text-center text-xs text-slate-400">
+        No menu items added yet
+      </div>
+    )}
+  </div>
+</div>
+
+
+          {/* ================= ADD NEW ITEM ================= */}
+         <div className={`${cardClass} rounded-2xl p-5`}>
+  {/* HEADER */}
+  <div className="mb-4">
+    <p className="text-[11px] uppercase tracking-wide text-slate-400">
+      Menu Management
+    </p>
+    <h2 className="text-sm font-semibold">
+      Add New Item
+    </h2>
+  </div>
+
+  <form onSubmit={handleAddItem} className="space-y-3 text-sm">
+    {/* ITEM NAME */}
+    <div className="flex flex-col gap-1">
+      <label className="text-[11px] text-slate-400">
+        Item Name
+      </label>
       <input
-        className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
-        placeholder="Item name"
+        className="w-full rounded-lg px-3 py-2 border border-slate-400/40 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400"
+        placeholder="e.g. Margherita Pizza"
         value={newItem.name}
         onChange={(e) =>
           setNewItem((n) => ({ ...n, name: e.target.value }))
         }
         required
       />
+    </div>
 
+    {/* PRICE */}
+    <div className="flex flex-col gap-1">
+      <label className="text-[11px] text-slate-400">
+        Price (₹)
+      </label>
       <input
-        className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
-        placeholder="Price"
         type="number"
+        className="w-full rounded-lg px-3 py-2 border border-slate-400/40 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400"
+        placeholder="e.g. 199"
         value={newItem.price}
         onChange={(e) =>
           setNewItem((n) => ({ ...n, price: e.target.value }))
         }
         required
       />
+    </div>
 
+    {/* CATEGORY */}
+    <div className="flex flex-col gap-1">
+      <label className="text-[11px] text-slate-400">
+        Category
+      </label>
       <input
-        className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
-        placeholder="Image URL (optional)"
-        value={newItem.imageUrl}
-        onChange={(e) =>
-          setNewItem((n) => ({ ...n, imageUrl: e.target.value }))
-        }
-      />
-
-      <input
-        className="w-full rounded-lg px-3 py-2 border border-slate-400 bg-transparent"
-        placeholder="Category (e.g. Pizza, Drinks)"
+        className="w-full rounded-lg px-3 py-2 border border-slate-400/40 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400"
+        placeholder="e.g. Pizza, Drinks, Desserts"
         value={newItem.category}
         onChange={(e) =>
           setNewItem((n) => ({ ...n, category: e.target.value }))
         }
         required
       />
+    </div>
 
+    {/* IMAGE URL */}
+    <div className="flex flex-col gap-1">
+      <label className="text-[11px] text-slate-400">
+        Image URL <span className="opacity-60">(optional)</span>
+      </label>
+      <input
+        className="w-full rounded-lg px-3 py-2 border border-slate-400/40 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400"
+        placeholder="https://example.com/image.jpg"
+        value={newItem.imageUrl}
+        onChange={(e) =>
+          setNewItem((n) => ({ ...n, imageUrl: e.target.value }))
+        }
+      />
+    </div>
+
+    {/* ACTION */}
+    <div className="pt-2">
       <button
         type="submit"
-        className="mt-1 bg-orange-500 text-black px-4 py-2 rounded-lg font-semibold"
+        className="w-full bg-orange-500 text-black px-4 py-2.5 rounded-xl font-semibold hover:bg-orange-400 transition"
       >
         Save Item
       </button>
-    </form>
-  </div>
-</section>
+    </div>
+  </form>
+</div>
 
+        </section>
 
         {/* ORDERS */}
-        <section className="mb-16">
-  <h2 className="text-sm font-semibold mb-2">All Orders</h2>
+       <section className="mb-16">
+  {/* SECTION HEADER */}
+  <div className="flex items-center justify-between mb-3">
+    <h2 className="text-sm font-semibold tracking-wide">
+      All Orders
+    </h2>
+    <span className={`text-xs ${mutedText}`}>
+      Total: {orders.length}
+    </span>
+  </div>
 
   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
     {orders.map((o) => {
       const amount = o.cart.reduce((s, item) => s + item.price, 0);
-      const isSelected = selectedOrderId === o._id; // ✅ FIXED
+      const isSelected = selectedOrderId === o._id;
 
       return (
         <div
           key={o._id}
-          className={`${cardClass} rounded-2xl p-4 ${
-            isSelected ? "ring-2 ring-orange-400" : ""
+          className={`${cardClass} rounded-2xl p-4 transition ${
+            isSelected
+              ? "ring-2 ring-orange-400 shadow-lg"
+              : "hover:shadow-md"
           }`}
         >
           {/* HEADER */}
-          <div className="flex justify-between items-center mb-1">
-            <p className="font-semibold text-sm">
-              Table {o.table}
-              <span className={`block text-[11px] ${mutedText}`}>
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <p className="text-xs uppercase tracking-wide opacity-60">
+                Order
+              </p>
+              <p className="font-bold text-base text-orange-400">
+                Table {o.table}
+              </p>
+              <p className={`text-[11px] ${mutedText}`}>
                 Bill #{o.billNo}
-              </span>
-            </p>
+              </p>
+            </div>
 
             <button
               onClick={() => printBill(o)}
-              className="text-[11px] px-2 py-1 rounded-full border border-slate-500"
+              className="text-[11px] px-3 py-1 rounded-full border border-slate-500/40 hover:bg-orange-500 hover:text-black transition"
             >
               🧾 Print
             </button>
           </div>
 
-          {/* STATUS */}
-          <p className="text-xs">
-            Status:{" "}
-            <span className="font-semibold text-orange-300">
-              {o.status}
-            </span>
-          </p>
+          {/* STATUS & PAYMENT */}
+          <div className="flex justify-between items-center text-xs mb-2">
+            <div>
+              <span className="opacity-60">Status:</span>{" "}
+              <span className="font-semibold text-orange-300">
+                {o.status}
+              </span>
+            </div>
 
-          <p className="text-xs">
-            Payment:{" "}
-            <span
-              className={
-                o.paymentStatus === "Paid"
-                  ? "text-emerald-400 font-semibold"
-                  : "text-yellow-300 font-semibold"
-              }
-            >
-              {o.paymentStatus}
-            </span>
-          </p>
+            <div>
+              <span className="opacity-60">Payment:</span>{" "}
+              <span
+                className={
+                  o.paymentStatus === "Paid"
+                    ? "text-emerald-400 font-semibold"
+                    : "text-yellow-400 font-semibold"
+                }
+              >
+                {o.paymentStatus}
+              </span>
+            </div>
+          </div>
 
-          <p className="text-xs mt-1">
-            Total:{" "}
-            <span className="font-semibold text-orange-400">
+          {/* TOTAL */}
+          <div className="flex justify-between items-center mb-2 text-sm">
+            <span className="opacity-60">Total Amount</span>
+            <span className="font-bold text-orange-400">
               ₹{amount}
             </span>
-          </p>
+          </div>
 
           {/* ITEMS */}
           <div
-            className={`text-[11px] mt-2 max-h-16 overflow-y-auto ${mutedText}`}
+            className={`text-[11px] mt-2 max-h-16 overflow-y-auto space-y-0.5 ${mutedText}`}
           >
             {o.cart.map((c, j) => (
               <p key={j}>• {c.name}</p>
@@ -695,13 +792,13 @@ export default function Admin() {
           </div>
 
           {/* ACTIONS */}
-          <div className="flex gap-2 mt-3 text-[11px]">
+          <div className="flex gap-2 mt-4 text-[11px]">
             <button
               onClick={() => {
-                setSelectedOrderId(o._id);   // ✅ Mongo ID
+                setSelectedOrderId(o._id);
                 setEditCart(o.cart || []);
               }}
-              className="flex-1 px-2 py-1 rounded-full bg-orange-500 text-black font-semibold"
+              className="flex-1 px-3 py-1.5 rounded-full bg-orange-500 text-black font-semibold hover:bg-orange-400 transition"
             >
               Edit
             </button>
@@ -710,7 +807,7 @@ export default function Admin() {
               onClick={() =>
                 updateOrderField("status", "Cancelled", o._id)
               }
-              className="flex-1 px-2 py-1 rounded-full bg-red-500/80 text-white"
+              className="flex-1 px-3 py-1.5 rounded-full bg-red-500/80 text-white font-semibold hover:bg-red-500 transition"
             >
               Cancel
             </button>
@@ -720,127 +817,199 @@ export default function Admin() {
     })}
   </div>
 </section>
+
         {/* BOTTOM EDIT BAR */}
         {selectedOrderId && (
-          <div
-            className={`fixed bottom-0 left-0 right-0 ${
-              dark ? "bg-slate-900" : "bg-white"
-            } border-t border-slate-700 px-4 py-3 flex flex-wrap items-center gap-3 text-xs z-50`}
-          >
-            {(() => {
-              const order = orders.find((o) => o._id === selectedOrderId);
-              if (!order) return null;
+  <div
+    className={`fixed bottom-0 left-0 right-0 z-50 border-t ${
+      dark
+        ? "bg-slate-900 border-slate-700 text-slate-100"
+        : "bg-white border-slate-200 text-slate-900"
+    }`}
+  >
+    {(() => {
+      const order = orders.find((o) => o._id === selectedOrderId);
+      if (!order) return null;
 
-              return (
-                <>
-                  <span className="font-semibold">
-                    Editing Bill #{order.billNo}
-                  </span>
+      return (
+        <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col gap-3">
+          {/* HEADER */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                Edit Order
+              </p>
+              <p className="text-sm font-semibold">
+                Bill #{order.billNo}
+              </p>
+            </div>
 
-                  {/* STATUS */}
-                  <select
-                    value={order.status}
-                    onChange={(e) =>
-                      updateOrderField("status", e.target.value, order._id)
-                    }
-                    className="border border-slate-500 rounded px-2 py-1 bg-transparent"
-                  >
-                    <option>Pending</option>
-                    <option>Preparing</option>
-                    <option>Ready</option>
-                    <option>Served</option>
-                    <option>Cancelled</option>
-                  </select>
-
-                  {/* PAYMENT */}
-                  <select
-                    value={order.paymentStatus}
-                    onChange={(e) =>
-                      updateOrderField(
-                        "paymentStatus",
-                        e.target.value,
-                        order._id
-                      )
-                    }
-                    className="border border-slate-500 rounded px-2 py-1 bg-transparent"
-                  >
-                    <option>Unpaid</option>
-                    <option>Paid</option>
-                  </select>
-
-                  {/* ADD ITEM */}
-                  <select
-                    onChange={(e) => {
-                      addItemToEditCart(e.target.value);
-                      e.target.value = "";
-                    }}
-                    className="border border-slate-500 rounded px-2 py-1 bg-transparent"
-                    defaultValue=""
-                  >
-                    <option value="">Add Item…</option>
-                    {menuItems.map((m) => (
-                      <option key={m._id} value={m._id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* EDIT CART */}
-                  <div className="flex gap-1 max-w-xs overflow-x-auto">
-                    {editCart.map((i, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => removeItemFromEditCart(idx)}
-                        className="px-2 py-1 rounded-full bg-slate-700 text-xs"
-                      >
-                        {i.name} ✕
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* SAVE */}
-                  <button
-                    onClick={saveEditedCart}
-                    className="px-3 py-1 rounded-full bg-emerald-500 text-black font-semibold"
-                  >
-                    Save Items
-                  </button>
-
-                  {/* CLOSE */}
-                  <button
-                    onClick={() => {
-                      setSelectedOrderId(null);
-                      setEditCart([]);
-                    }}
-                    className="px-3 py-1 rounded-full bg-slate-600 text-slate-50"
-                  >
-                    Close
-                  </button>
-                </>
-              );
-            })()}
+            <button
+              onClick={() => {
+                setSelectedOrderId(null);
+                setEditCart([]);
+              }}
+              className="h-8 w-8 rounded-lg border border-slate-400/40 flex items-center justify-center text-sm hover:bg-red-500 hover:text-white transition"
+              title="Close"
+            >
+              ✕
+            </button>
           </div>
-        )}
-        {showAvatar && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="relative bg-black rounded-2xl p-3 border  shadow-2xl animate-fadeIn">
-              {/* ❌ Close Button */}
-              <button
-                onClick={() => setShowAvatar(false)}
-                className="absolute -top-3 -right-3 bg-orange-500 text-black h-7 w-7 rounded-full font-bold"
-              >
-                ✕
-              </button>
 
-              {/* ✅ Full Image Preview */}
-              <img
-                src="/Screenshot 2025-12-06 160752.png"
-                alt="Preview"
-                className="max-h-[70vh] max-w-[70vw] rounded-xl object-contain"
-              />
+          {/* CONTROLS GRID */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+            {/* STATUS */}
+            <div className="flex flex-col gap-1">
+              <span className="text-slate-400">Status</span>
+              <select
+                value={order.status}
+                onChange={(e) =>
+                  updateOrderField("status", e.target.value, order._id)
+                }
+                className="rounded-lg px-2 py-1.5 border border-slate-400/40 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400"
+              >
+                <option>Pending</option>
+                <option>Preparing</option>
+                <option>Ready</option>
+                <option>Served</option>
+                <option>Cancelled</option>
+              </select>
+            </div>
+
+            {/* PAYMENT */}
+            <div className="flex flex-col gap-1">
+              <span className="text-slate-400">Payment</span>
+              <select
+                value={order.paymentStatus}
+                onChange={(e) =>
+                  updateOrderField(
+                    "paymentStatus",
+                    e.target.value,
+                    order._id
+                  )
+                }
+                className="rounded-lg px-2 py-1.5 border border-slate-400/40 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400"
+              >
+                <option>Unpaid</option>
+                <option>Paid</option>
+              </select>
+            </div>
+
+            {/* ADD ITEM */}
+            <div className="flex flex-col gap-1">
+              <span className="text-slate-400">Add Item</span>
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  addItemToEditCart(e.target.value);
+                  e.target.value = "";
+                }}
+                className="rounded-lg px-2 py-1.5 border border-slate-400/40 bg-transparent focus:outline-none focus:ring-1 focus:ring-orange-400"
+              >
+                <option value="">Select item…</option>
+                {menuItems.map((m) => (
+                  <option key={m._id} value={m._id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-        )}
+
+          {/* CART ITEMS */}
+          {editCart.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pt-1">
+              {editCart.map((i, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => removeItemFromEditCart(idx)}
+                  className="px-3 py-1.5 rounded-full border border-orange-400/40 bg-orange-400/10 text-orange-400 text-xs font-medium whitespace-nowrap hover:bg-orange-400 hover:text-black transition"
+                >
+                  {i.name} ✕
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ACTIONS */}
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={saveEditedCart}
+              className="flex-1 rounded-xl bg-orange-500 text-black py-2 font-semibold hover:bg-orange-400 transition"
+            >
+              Save Changes
+            </button>
+
+            <button
+              onClick={() => {
+                setSelectedOrderId(null);
+                setEditCart([]);
+              }}
+              className="flex-1 rounded-xl border border-slate-400/40 py-2 font-semibold hover:bg-slate-700 hover:text-white transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    })()}
+  </div>
+)}
+
+       {showAvatar && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
+    {/* Overlay click close (optional UX improvement) */}
+    <div
+      className="absolute inset-0"
+      onClick={() => setShowAvatar(false)}
+    />
+
+    {/* Modal Card */}
+    <div className="relative z-10 animate-scaleIn">
+      {/* Close Button */}
+      <button
+        onClick={() => setShowAvatar(false)}
+        className="absolute -top-3 -right-3 h-8 w-8 rounded-full bg-orange-500 text-black font-bold shadow-lg hover:scale-105 transition"
+        title="Close"
+      >
+        ✕
+      </button>
+
+      {/* Image Container */}
+      <div className="rounded-3xl border border-white/10 bg-gradient-to-b from-slate-900 to-black p-3 shadow-2xl">
+        <img
+          src="/Screenshot 2025-12-06 160752.png"
+          alt="Profile Preview"
+          className="max-h-[75vh] max-w-[75vw] rounded-2xl object-contain"
+        />
+
+        {/* Caption */}
+        <div className="mt-3 text-center">
+          <p className="text-sm font-semibold text-orange-400">
+            Admin Profile
+          </p>
+          <p className="text-[11px] text-slate-400">
+            Bachelor&apos;s Hub
+          </p>
+        </div>
+      </div>
+    </div>
+
+    {/* Animation */}
+    <style>
+      {`
+        @keyframes scaleIn {
+          from { transform: scale(0.92); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+        .animate-scaleIn {
+          animation: scaleIn 0.25s ease-out;
+        }
+      `}
+    </style>
+  </div>
+)}
+
       </main>
     </div>
   );

@@ -183,20 +183,31 @@ app.delete("/items/:id", verifyToken, requireRole("admin"), async (req, res) => 
 ================================ */
 app.post("/order", async (req, res) => {
   try {
-    const newOrder = await Order.create({
-      table: req.body.table,
+    const lastOrder = await Order.findOne().sort({ createdAt: -1 });
+
+    // ✅ SAFE number generation (NO NaN POSSIBLE)
+    const lastNumber = lastOrder?.orderNumber || 0;
+    const nextNumber = lastNumber + 1;
+
+    const newOrder = new Order({
+      orderNumber: nextNumber,                     // 1,2,3...
+      orderToken: `A${String(nextNumber).padStart(3, "0")}`, // A001
       cart: req.body.cart,
       status: "Pending",
       paymentStatus: req.body.paymentStatus || "Unpaid",
       paymentMethod: req.body.paymentMethod || "Cash",
-      billNo: Date.now(),
     });
+
+    await newOrder.save();
 
     res.json({ success: true, payload: newOrder });
   } catch (err) {
+    console.error("Order error:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+
 
 /* ================================
    ✅ GET ALL ORDERS (Admin / Kitchen)
@@ -222,6 +233,15 @@ app.post("/update-status", verifyToken, async (req, res) => {
   await Order.findByIdAndUpdate(orderId, { status });
   res.json({ success: true });
 });
+
+/* ================================
+   ✅ GET ALL ORDERS (KITCHEN / ADMIN)
+================================ */
+app.get("/orders", verifyToken, async (req, res) => {
+  const orders = await Order.find().sort({ createdAt: 1 });
+  res.json(orders);
+});
+
 
 
 /* ================================

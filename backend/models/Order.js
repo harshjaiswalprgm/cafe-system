@@ -2,7 +2,15 @@ const mongoose = require("mongoose");
 
 const orderSchema = new mongoose.Schema(
   {
-    table: String,
+    orderNumber: {
+      type: Number,
+      required: true,
+    },
+
+    orderToken: {
+      type: String,
+      required: true,
+    },
 
     cart: [
       {
@@ -23,14 +31,7 @@ const orderSchema = new mongoose.Schema(
 
     paymentMethod: {
       type: String,
-      default: "Cash", // QR | Cash
-    },
-
-    billNo: Number,
-
-    time: {
-      type: Date,
-      default: Date.now,
+      default: "Cash",
     },
   },
   { timestamps: true }

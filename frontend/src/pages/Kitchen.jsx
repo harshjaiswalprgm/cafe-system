@@ -24,7 +24,7 @@ export default function Kitchen() {
       return true;
     });
 
-    const newIds = data.map((o) => o.billNo);
+    const newIds = data.map((o) => o._id);
     const prevIds = prevIdsRef.current;
     const justAdded = newIds.filter((id) => !prevIds.includes(id));
 
@@ -53,41 +53,33 @@ export default function Kitchen() {
       document.documentElement.requestFullscreen?.().catch(() => {});
     }
   }, [orders.length]);
+  const updateStatus = async (orderId, status) => {
+    await fetch(`http://localhost:5000/orders/${orderId}/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ status }),
+    });
 
- const updateStatus = async (orderId, status) => {
-  await fetch("http://localhost:5000/update-status", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
-    body: JSON.stringify({
-      id: orderId,
-      status,
-      servedAt: status === "Served" ? new Date() : null,
-    }),
-  });
+    loadOrders();
+  };
 
-  loadOrders(); // ✅ refresh after update
-};
+  const markPaid = async (orderId) => {
+    await fetch(`http://localhost:5000/orders/${orderId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({
+        paymentStatus: "Paid",
+      }),
+    });
 
-
- const markPaid = async (orderId) => {
-  await fetch("http://localhost:5000/update-payment", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
-    body: JSON.stringify({
-      id: orderId,
-      paymentStatus: "Paid",
-    }),
-  });
-
-  loadOrders(); // ✅ refresh
-};
-
+    loadOrders();
+  };
 
   // ✅ THEME SYSTEM
   const bgClass = dark ? "bg-[#0c0c0c] text-white" : "bg-slate-100 text-black";
@@ -131,7 +123,11 @@ export default function Kitchen() {
       {/* ✅ ORDERS GRID */}
       <div className="max-w-7xl mx-auto grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
         {orders.map((order, index) => {
-          const amount = order.cart.reduce((sum, item) => sum + item.price, 0);
+          const amount = order.cart.reduce(
+            (sum, item) => sum + item.price * (item.qty || 1),
+            0
+          );
+
           const isNew = highlightIds.includes(order.billNo);
 
           let statusClasses =
@@ -149,7 +145,6 @@ export default function Kitchen() {
           } else if (order.status === "Cancelled") {
             statusClasses = "bg-red-400 text-black border border-red-600";
           }
-
           const paid =
             order.paymentStatus && order.paymentStatus.toLowerCase() === "paid";
 
@@ -205,21 +200,21 @@ export default function Kitchen() {
               {/* ACTION BUTTONS */}
               <div className="flex flex-wrap gap-2 text-xs">
                 <button
-                onClick={() => updateStatus(order._id, "Preparing")}
+                  onClick={() => updateStatus(order._id, "Preparing")}
                   className="flex-1 px-3 py-1 rounded-full bg-yellow-400 text-black font-bold"
                 >
                   Preparing
                 </button>
 
                 <button
-                onClick={() => updateStatus(order._id, "Ready")}
+                  onClick={() => updateStatus(order._id, "Ready")}
                   className="flex-1 px-3 py-1 rounded-full bg-blue-400 text-black font-bold"
                 >
                   Ready
                 </button>
 
                 <button
-                onClick={() => updateStatus(order._id, "Served")}
+                  onClick={() => updateStatus(order._id, "Served")}
                   className="flex-1 px-3 py-1 rounded-full bg-green-400 text-black font-bold"
                 >
                   Served
@@ -227,7 +222,7 @@ export default function Kitchen() {
 
                 {!paid && (
                   <button
-                   onClick={() => markPaid(order._id)}
+                    onClick={() => markPaid(order._id)}
                     className="w-full px-3 py-1 rounded-full bg-orange-500 text-black font-bold"
                   >
                     ✅ Mark Paid
