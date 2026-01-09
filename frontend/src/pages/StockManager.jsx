@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-
+const API = import.meta.env.VITE_API_URL;
 export default function StockManager() {
   const [items, setItems] = useState([]);
 
   const loadItems = async () => {
-    const res = await fetch("http://localhost:5000/items", {
+    const res = await fetch(`${API}/items`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`, // ✅ JWT
       },
@@ -19,7 +19,7 @@ export default function StockManager() {
   }, []);
 
   const updateStock = async (id, stock) => {
-    await fetch("http://localhost:5000/update-stock", {
+    await fetch(`${API}/update-stock`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -32,7 +32,7 @@ export default function StockManager() {
   };
 
   const toggleAvailability = async (id, available) => {
-    await fetch("http://localhost:5000/update-stock", {
+    await fetch(`${API}/update-stock`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

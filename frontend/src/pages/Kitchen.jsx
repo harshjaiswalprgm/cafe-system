@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+const API = import.meta.env.VITE_API_URL;
 
 export default function Kitchen() {
   const [orders, setOrders] = useState([]);
@@ -8,7 +9,7 @@ export default function Kitchen() {
   const prevIdsRef = useRef([]);
 
   const loadOrders = async () => {
-    const res = await fetch("http://localhost:5000/orders", {
+    const res = await fetch(`${API}/orders`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
@@ -54,7 +55,7 @@ export default function Kitchen() {
     }
   }, [orders.length]);
   const updateStatus = async (orderId, status) => {
-    await fetch(`http://localhost:5000/orders/${orderId}/status`, {
+    await fetch(`${API}/orders/${orderId}/status`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -67,7 +68,7 @@ export default function Kitchen() {
   };
 
   const markPaid = async (orderId) => {
-    await fetch(`http://localhost:5000/orders/${orderId}`, {
+    await fetch(`${API}/orders/${orderId}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",

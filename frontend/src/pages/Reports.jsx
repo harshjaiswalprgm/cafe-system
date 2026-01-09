@@ -1,5 +1,6 @@
 import ReportExport from "../components/ReportExport";
 import { useEffect, useState } from "react";
+const API = import.meta.env.VITE_API_URL;
 import {
   BarChart,
   Bar,
@@ -27,12 +28,12 @@ export default function Reports() {
       const token = localStorage.getItem("token");
 
       const [ordersRes, reportsRes] = await Promise.all([
-        fetch("http://localhost:5000/orders", {
+        fetch(`${API}/orders`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }),
-        fetch("http://localhost:5000/reports", {
+        fetch(`${API}/reports`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

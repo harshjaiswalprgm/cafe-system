@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-
+const API = import.meta.env.VITE_API_URL;
 import {
   BarChart,
   Bar,
@@ -50,13 +50,13 @@ export default function Admin() {
       }
 
     const [ordersRes, reportsRes, itemsRes] = await Promise.all([
-  fetch("http://localhost:5000/orders", {
-    headers: { Authorization: `Bearer ${token}` },
-  }),
-  fetch("http://localhost:5000/reports", {
-    headers: { Authorization: `Bearer ${token}` },
-  }),
-  fetch("http://localhost:5000/items"),
+      fetch(`${API}/orders`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      fetch(`${API}/reports`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+  fetch(`${API}/items`),
 ]);
 
 
@@ -127,7 +127,7 @@ const dailyData = Object.entries(reports?.daily || {}).map(([date, total]) => ({
   const handleAddItem = async (e) => {
     e.preventDefault();
 
-    await fetch("http://localhost:5000/items", {
+    await fetch(`${API}/items`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -140,7 +140,7 @@ const dailyData = Object.entries(reports?.daily || {}).map(([date, total]) => ({
     load();
   };
   const handleDeleteItem = async (id) => {
-    await fetch(`http://localhost:5000/items/${id}`, {
+    await fetch(`${API}/items/${id}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -281,7 +281,7 @@ const dailyData = Object.entries(reports?.daily || {}).map(([date, total]) => ({
   const updateOrderField = (field, value, orderId = selectedOrderId) => {
     if (!orderId) return;
 
-    fetch("http://localhost:5000/admin-update-order", {
+    fetch(`${API}/admin-update-order`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -307,7 +307,7 @@ const dailyData = Object.entries(reports?.daily || {}).map(([date, total]) => ({
   const saveEditedCart = () => {
     if (!selectedOrderId) return;
 
-    fetch("http://localhost:5000/admin-update-order", {
+    fetch(`${API}/admin-update-order`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -1,3 +1,4 @@
+const API = import.meta.env.VITE_API_URL;
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -14,7 +15,7 @@ export default function Login() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:5000/login", {
+      const res = await fetch(`${API}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),

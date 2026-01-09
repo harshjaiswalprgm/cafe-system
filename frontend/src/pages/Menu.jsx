@@ -1,3 +1,4 @@
+const API = import.meta.env.VITE_API_URL;
 import { useEffect, useMemo, useState } from "react";
 import FloatingNavbar from "../components/FloatingNavbar";
 import Footer from "../components/Footer";
@@ -99,7 +100,8 @@ export default function Menu() {
 
   /* ================= FETCH ITEMS ================= */
   useEffect(() => {
-    fetch("http://localhost:5000/items")
+   fetch(`${API}/items`)
+
       .then((res) => res.json())
       .then(setItems)
       .catch(() => setItems([]));
@@ -162,7 +164,7 @@ export default function Menu() {
       }))
     );
 
-    await fetch("http://localhost:5000/order", {
+    await fetch(`${API}/order`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
