@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+
 import Menu from "./pages/Menu";
 import Kitchen from "./pages/Kitchen";
 import Admin from "./pages/Admin";
@@ -6,7 +7,14 @@ import Login from "./pages/Login";
 import StockManager from "./pages/StockManager";
 import Reports from "./pages/Reports";
 
+import CustomerLayout from "./layouts/CustomerLayout";
+import DailyOffers from "./components/DailyOffers";
+import GoogleReviews from "./components/GoogleReviews";
+import ImageFeed from "./components/ImageFeed";
 
+/* =================================================
+   ✅ PROTECTED ROUTE
+================================================= */
 function ProtectedRoute({ allowedRoles, children }) {
   const location = useLocation();
   const role = localStorage.getItem("role");
@@ -22,11 +30,23 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-900 via-black to-neutral-950 text-white">
       <Routes>
-        <Route path="/admin/stock" element={<StockManager />} /> // new route added here for stockManager
-         <Route path="/admin/reports" element={<Reports />} />
-
+        {/* DEFAULT */}
         <Route path="/" element={<Navigate to="/menu/1" />} />
-        <Route path="/menu/:table" element={<Menu />} />
+
+        {/* ================= CUSTOMER SIDE ================= */}
+        <Route
+          path="/menu/:table"
+          element={
+            <CustomerLayout>
+              <Menu />
+              <DailyOffers />
+              <ImageFeed />
+              <GoogleReviews />
+            </CustomerLayout>
+          }
+        />
+
+        {/* ================= KITCHEN ================= */}
         <Route
           path="/kitchen"
           element={
@@ -35,6 +55,8 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* ================= ADMIN ================= */}
         <Route
           path="/admin"
           element={
@@ -43,6 +65,26 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/admin/stock"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <StockManager />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedRoute allowedRoles={["admin"]}>
+              <Reports />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ================= LOGIN ================= */}
         <Route path="/login" element={<Login />} />
       </Routes>
     </div>

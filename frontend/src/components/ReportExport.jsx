@@ -4,7 +4,7 @@ import React from "react";
  * orders  -> array of order objects
  * reports -> { daily, monthly }
  */
-export default function ReportExport({ orders = [], reports = {} }) {
+export default function ReportExport({ orders = [] }) {
 
   /* ===============================
      ✅ EXPORT TO CSV (EXCEL)
@@ -64,9 +64,12 @@ export default function ReportExport({ orders = [], reports = {} }) {
   };
 
   /* ===============================
-     🧾 PRINT 58mm GST BILL
+     🧾 FINAL 58mm BILL (EXPORT ONLY)
+     ⚠️ DO NOT RENDER BUTTONS HERE
   =============================== */
   const printBill = (order) => {
+    if (!order || !order.cart?.length) return;
+
     const subtotal = order.cart.reduce(
       (s, i) => s + i.price * (i.qty || 1),
       0
@@ -77,7 +80,6 @@ export default function ReportExport({ orders = [], reports = {} }) {
       0
     );
 
-    // GST – for now fixed (later category-wise)
     const cgstRate = 2.5;
     const sgstRate = 2.5;
 
@@ -92,30 +94,36 @@ export default function ReportExport({ orders = [], reports = {} }) {
     const itemsRows = order.cart
       .map(
         (i) => `
-        <tr>
-          <td>${i.name}</td>
-          <td style="text-align:center">${i.qty || 1}</td>
-          <td style="text-align:right">${i.price}</td>
-        </tr>
-      `
+          <tr>
+            <td>${i.name}</td>
+            <td style="text-align:center">${i.qty || 1}</td>
+            <td style="text-align:right">₹${i.price}</td>
+          </tr>
+        `
       )
       .join("");
 
-    const win = window.open("", "_blank");
+    const win = window.open("", "_blank", "width=380,height=600");
+    if (!win) {
+      alert("Please allow popups to print the bill.");
+      return;
+    }
+
     win.document.write(`
       <html>
         <head>
-          <title>Bill</title>
+          <title>Bill ${order.orderToken}</title>
           <style>
             body {
               width: 58mm;
               font-family: monospace;
               font-size: 11px;
               margin: 0;
+              padding: 4px;
             }
-            h3, h4, p { margin: 2px 0; text-align:center; }
+            h3, h4, p { margin: 2px 0; text-align: center; }
             table { width:100%; border-collapse:collapse; }
-            td, th { padding:2px 0; }
+            th, td { padding:2px 0; }
             .right { text-align:right; }
             .center { text-align:center; }
             hr { border-top:1px dashed #000; margin:4px 0; }
@@ -162,22 +170,10 @@ export default function ReportExport({ orders = [], reports = {} }) {
 
           <p class="center"><b>Tax Summary</b></p>
           <table>
-            <tr>
-              <td>CGST @ ${cgstRate}%</td>
-              <td class="right">₹${cgstAmt}</td>
-            </tr>
-            <tr>
-              <td>SGST @ ${sgstRate}%</td>
-              <td class="right">₹${sgstAmt}</td>
-            </tr>
-            <tr>
-              <td><b>Total Tax</b></td>
-              <td class="right"><b>₹${totalTax}</b></td>
-            </tr>
-            <tr>
-              <td>Round Off</td>
-              <td class="right">₹${roundOff}</td>
-            </tr>
+            <tr><td>CGST @ ${cgstRate}%</td><td class="right">₹${cgstAmt}</td></tr>
+            <tr><td>SGST @ ${sgstRate}%</td><td class="right">₹${sgstAmt}</td></tr>
+            <tr><td><b>Total Tax</b></td><td class="right"><b>₹${totalTax}</b></td></tr>
+            <tr><td>Round Off</td><td class="right">₹${roundOff}</td></tr>
           </table>
 
           <hr/>
@@ -188,35 +184,37 @@ export default function ReportExport({ orders = [], reports = {} }) {
 
           <p>Thank you! Visit Again ☕</p>
 
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(() => window.close(), 300);
+            };
+          </script>
+
         </body>
       </html>
     `);
 
     win.document.close();
-    win.print();
   };
 
   /* ===============================
-     ✅ UI
+     ✅ REPORTS UI (NO PRINT HERE)
   =============================== */
   return (
-    <div className="flex flex-wrap gap-3 mb-6">
+    <div className="flex gap-3 mb-6">
       <button
         onClick={exportExcel}
-        className="px-4 py-2 rounded bg-emerald-500 font-semibold"
+        className="px-4 py-2 rounded bg-emerald-500 text-black font-semibold"
       >
         ⬇️ Export Orders (Excel)
       </button>
-
-      {orders.map((o) => (
-        <button
-          key={o._id}
-          onClick={() => printBill(o)}
-          className="px-3 py-1 rounded bg-slate-200 text-sm"
-        >
-          🧾 Print {o.orderToken}
-        </button>
-      ))}
     </div>
   );
 }
+
+/* =================================================
+   ✅ IMPORTANT:
+   - Bill printing is REMOVED from Reports UI
+   - Admin dashboard will CALL printBill(order)
+================================================= */
