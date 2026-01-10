@@ -25,12 +25,14 @@ app.use(express.json());
 app.use(
   cors({
     origin: [
-      "http://localhost:5173", // local frontend
-      "https://asha-cafe-frontend.onrender.com", // deployed frontend (update later)
+      "http://localhost:5173",
+      "https://cafe-system-eta.vercel.app",
+      "https://cafe-system-pxgwrtdr2-harsh-jaiswals-projects-d196f3a8.vercel.app"
     ],
     credentials: true,
   })
 );
+app.options("*", cors());
 
 /* ================================
    ✅ MONGODB CONNECTION
